@@ -20,11 +20,10 @@ object ChatCore {
     private const val AI_MODEL = "GigaChat"
 
     private val logicScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var token = MutableStateFlow<String?>(null).apply {
-        filter { token -> token != null }
-        onEach {
+    private val token = MutableStateFlow<String?>(null).apply {
+        filter { token -> token != null }.onEach {
             _currentState.update { state ->
-                if (state is State.Stopped)  {
+                if (state is State.Stopped) {
                     State.Live.Idle()
                 } else {
                     state
@@ -56,7 +55,7 @@ object ChatCore {
         }
     }
 
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, temperature: Float) {
         val newState = _currentState.updateAndGet { state ->
             if (state is State.Live.Idle) State.Live.Requesting else state
         }
@@ -71,7 +70,7 @@ object ChatCore {
         logicScope.launch {
             var errorMessage: String? = null
             addMessage(role = Message.USER, text = text)
-            KtorClient.sendMessage(token, AI_MODEL, text)
+            KtorClient.sendMessage(token, AI_MODEL, text, temperature)
                 .onSuccess { response ->
                     val text = response.choices.firstOrNull()?.message?.content ?: "<Empty answer>"
                     addMessage(role = Message.ASSISTANT, text = text)
@@ -90,6 +89,11 @@ object ChatCore {
 
     fun resetError() {
 
+    }
+
+    fun refreshToken() {
+        token.value = null
+        receiveToken()
     }
 
     sealed interface State {

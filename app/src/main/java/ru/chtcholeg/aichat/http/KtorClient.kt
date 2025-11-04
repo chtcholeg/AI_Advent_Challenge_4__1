@@ -91,11 +91,12 @@ object KtorClient {
         }
     }
 
-    suspend fun sendMessage(token: String, model: String, message: String): Result<AIResponse> {
+    suspend fun sendMessage(token: String, model: String, message: String, temperature: Float): Result<AIResponse> {
         return try {
             val aiRequest = AIRequest(
                 model = model,
                 messages = listOf(Message(role = ROLE_USER, message)),
+                temperature = temperature,
             )
             instance.post("$API_BASE_URL/chat/completions") {
                 contentType(ContentType.Application.Json)

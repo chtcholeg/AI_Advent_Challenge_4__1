@@ -3,15 +3,18 @@ package ru.chtcholeg.aichat.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -38,7 +41,7 @@ import ru.chtcholeg.aichat.ui.theme.AIChatTheme
 
 @Composable
 fun ChatScreen(
-    modifier: Modifier = Modifier.Companion,
+    modifier: Modifier = Modifier,
     viewModel: ChatViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -50,24 +53,30 @@ fun ChatScreen(
 private fun ChatScreen(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
-    modifier: Modifier = Modifier.Companion,
+    modifier: Modifier = Modifier,
 ) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("AI Chat") }
+                title = { Text("AI Chat") },
             )
         },
-        modifier = Modifier.Companion.fillMaxSize()
+        modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         Column(
             modifier = modifier
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
+            // Settings
+            Settings(
+                onAction = onAction,
+                temperature = state.temperature,
+            )
+
             // Messages list
             LazyColumn(
-                modifier = Modifier.Companion
+                modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
                 reverseLayout = true
@@ -80,14 +89,14 @@ private fun ChatScreen(
             // Loading indicator
             if (state.isLoading) {
                 LinearProgressIndicator(
-                    modifier = Modifier.Companion.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
             // Error message
             state.error?.let { error ->
                 Card(
-                    modifier = Modifier.Companion
+                    modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp),
                     colors = CardDefaults.cardColors(
@@ -98,7 +107,7 @@ private fun ChatScreen(
                     Text(
                         text = error,
                         color = MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.Companion.padding(16.dp)
+                        modifier = Modifier.padding(16.dp)
                     )
                 }
             }
@@ -109,7 +118,7 @@ private fun ChatScreen(
                 onInputTextChange = { onAction(ChatAction.Input(it)) },
                 onSendMessage = { onAction(ChatAction.SendMessage) },
                 isLoading = state.isLoading,
-                modifier = Modifier.Companion.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             )
 
         }
@@ -117,9 +126,42 @@ private fun ChatScreen(
 }
 
 @Composable
+private fun Settings(
+    onAction: (ChatAction) -> Unit,
+    temperature: Float,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = Modifier.padding(8.dp),
+    ) {
+        Button(
+            onClick = { onAction(ChatAction.RefreshToken) },
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
+            Text("Refresh token")
+        }
+        Row(
+            modifier = Modifier.padding(vertical = 4.dp),
+        ) {
+            Text(
+                text = "Temperature\n(≈0 - deterministic answer)",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(2f),
+            )
+            Spacer(Modifier.width(8.dp))
+            FloatTextField(
+                value = temperature,
+                onValueChange = { onAction(ChatAction.NewTemperature(it)) },
+                modifier = Modifier.weight(1.2f),
+            )
+        }
+    }
+}
+
+@Composable
 private fun MessageBubble(
     message: Message,
-    modifier: Modifier = Modifier.Companion
+    modifier: Modifier = Modifier
 ) {
     val alignment = if (message.isFromUser) Alignment.Companion.CenterEnd else Alignment.Companion.CenterStart
     val backgroundColor = if (message.isFromUser) {
@@ -132,8 +174,8 @@ private fun MessageBubble(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val startPadding = if (message.isFromUser) 16.dp else 0.dp
-    val endPadding = if (message.isFromUser) 0.dp else 16.dp
+    val startPadding = if (message.isFromUser) 24.dp else 0.dp
+    val endPadding = if (message.isFromUser) 0.dp else 24.dp
 
     Box(
         modifier = modifier
@@ -149,7 +191,7 @@ private fun MessageBubble(
             Text(
                 text = message.content,
                 color = textColor,
-                modifier = Modifier.Companion.padding(all = 16.dp)
+                modifier = Modifier.padding(all = 16.dp)
             )
         }
     }
@@ -161,17 +203,17 @@ private fun InputArea(
     onInputTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     isLoading: Boolean,
-    modifier: Modifier = Modifier.Companion
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.padding(16.dp),
-        verticalAlignment = Alignment.Companion.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
         TextField(
             value = inputText,
             onValueChange = onInputTextChange,
             placeholder = { Text("Type a message...") },
-            modifier = Modifier.Companion
+            modifier = Modifier
                 .weight(1f)
                 .padding(end = 8.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Companion.Send),
@@ -193,7 +235,7 @@ private fun InputArea(
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.Companion.size(24.dp),
+                    modifier = Modifier.size(24.dp),
                     strokeWidth = 2.dp
                 )
             } else {
@@ -208,7 +250,7 @@ private fun InputArea(
 
 @Preview(showBackground = true)
 @Composable
-fun GreetingScreen() {
+fun ChatScreenPreview() {
     AIChatTheme {
         ChatScreen(
             ChatState(),
