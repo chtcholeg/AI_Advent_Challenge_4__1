@@ -73,7 +73,7 @@ private fun ChatScreen(
                 reverseLayout = true
             ) {
                 items(count = state.messages.size) { message ->
-                    MessageBubble(message = state.messages[message])
+                    MessageBubble(chatMessage = state.messages[message])
                 }
             }
 

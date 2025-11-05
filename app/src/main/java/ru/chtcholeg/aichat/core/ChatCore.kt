@@ -20,37 +20,6 @@ object ChatCore {
     private const val CLIENT_ID = BuildConfig.CLIENT_ID
     private const val CLIENT_SECRET = BuildConfig.CLIENT_SECRET
     private const val AI_MODEL = "GigaChat"
-    private const val JSON_PROMPT =
-        "Ты должен ВСЕГДА отвечать ТОЛЬКО в формате JSON. Любой другой формат ответа запрещен.\n" +
-                "- Ответ должен быть ВАЛИДНЫМ JSON объектом\n" +
-                "- Не добавляй никакого текста до или после JSON\n" +
-                "- Не используй markdown formatting (```json```)\n" +
-                "- Если не можешь выполнить запрос, верни JSON с полем \"error\"\n" +
-                "Структура ответа ДОЛЖНА быть такой:\n" +
-                "{\n" +
-                "  \"title\": \"заголовок твоего ответа в виде одной короткой строки - выжимки из вопроса\",\n" +
-                "  \"message\": \"основной ответ\",\n" +
-                "  \"status\": \"success|error\",\n" +
-                "  \"uncode_symbols\": \"строка из нескольких (3-5) юникодных символов-картинок, которые имеют какое-то отношение к запросу\"" +
-                "}"
-    private const val XML_PROMPT =
-        "Ты должен ВСЕГДА отвечать ТОЛЬКО в формате XML. Любой другой формат ответа запрещен.\n" +
-                "\n" +
-                "Требования к ответу:\n" +
-                "- Ответ должен быть ВАЛИДНЫМ XML документом\n" +
-                "- Не добавляй никакого текста до или после XML\n" +
-                "- Не используй markdown formatting (```xml```)\n" +
-                "- Все теги должны быть правильно закрыты\n" +
-                "- Используй XML декларацию в начале\n" +
-                "\n" +
-                "Структура ответа ДОЛЖНА быть такой:\n" +
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                "<response>\n" +
-                "  <title>заголовок твоего ответа в виде одной короткой строки - выжимки из вопроса</title>\n" +
-                "  <message>основной ответ</message>\n" +
-                "  <status>success|error</status>\n" +
-                "  <uncode_symbols>строка из нескольких (3-5) юникодных символов-картинок, которые имеют какое-то отношение к запросу</uncode_symbols>\n" +
-                "</response>"
 
     private val logicScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val token = MutableStateFlow<String?>(null).apply {
@@ -146,8 +115,8 @@ object ChatCore {
     private fun getMessageListToSend(): List<Message> {
         val systemMessage = when (_outputContent.value) {
             OutputContent.PLAIN_TEXT -> null
-            OutputContent.JSON -> Message(Role.SYSTEM, JSON_PROMPT)
-            OutputContent.XML -> Message(Role.SYSTEM, XML_PROMPT)
+            OutputContent.JSON -> Message(Role.SYSTEM, SystemPrompts.JSON)
+            OutputContent.XML -> Message(Role.SYSTEM, SystemPrompts.XML)
         }
         return listOfNotNull(systemMessage) + _messages.value
     }

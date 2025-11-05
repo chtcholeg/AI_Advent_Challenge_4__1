@@ -8,7 +8,6 @@ data class Message(
     val role: Role, // system, user, assistant, function
     val content: String,
 ) {
-    val isFromUser: Boolean get() = role == Role.USER
     val isNotSystem: Boolean get() = role == Role.USER || role == Role.ASSISTANT
 
     @Serializable

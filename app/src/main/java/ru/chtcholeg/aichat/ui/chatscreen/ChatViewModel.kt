@@ -5,19 +5,21 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.chtcholeg.aichat.core.ChatCore
 import ru.chtcholeg.aichat.http.Message
+import ru.chtcholeg.aichat.http.Message.Role
+import ru.chtcholeg.aichat.utils.ParserUtils
 
 enum class OutputContent { PLAIN_TEXT, JSON, XML }
 
 data class ChatState(
-    val messages: List<Message> = emptyList(),
+    val messages: List<ChatMessage> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val inputText: String = "",
@@ -29,8 +31,29 @@ data class ChatState(
             val outputContent: OutputContent = OutputContent.PLAIN_TEXT,
         ) : Dialog
     }
-
 }
+
+sealed interface ChatMessage {
+    data class RegularMessage(val originalMessage: Message) : ChatMessage
+    data class Parsed(
+        val outputContent: OutputContent,
+        val title: String,
+        val beautifulFraming: String,
+        val message: String,
+    ) : ChatMessage
+
+    data class ErrorOnParsing(
+        val outputContent: OutputContent,
+        val message: String,
+    ) : ChatMessage
+}
+
+val ChatMessage.isFromUser: Boolean
+    get() = if (this is ChatMessage.RegularMessage) {
+        originalMessage.role == Role.USER
+    } else {
+        false
+    }
 
 sealed interface ChatAction {
     data object SendMessage : ChatAction
@@ -58,12 +81,37 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    private val messages = ChatCore.messages
-        .map { messages ->
-            messages
-                .filter { it.isNotSystem }
-                .reversed()
+    private val messages: Flow<List<ChatMessage>> = combine(
+        ChatCore.messages,
+        ChatCore.outputContent
+    ) { messages, outputContent ->
+        val result = messages.filter { it.isNotSystem }.map { ChatMessage.RegularMessage(it) }
+        val parsedMessage = messages
+            .lastOrNull()
+            ?.takeIf { it.role == Message.Role.ASSISTANT && outputContent != OutputContent.PLAIN_TEXT }
+            ?.parse(outputContent)
+
+        (result + listOfNotNull(parsedMessage)).reversed()
+    }
+
+    private fun Message.parse(outputContent: OutputContent): ChatMessage {
+        return try {
+            val parserUtils = ParserUtils()
+            val parsedMessage = when (outputContent) {
+                OutputContent.PLAIN_TEXT -> emptyMap()
+                OutputContent.XML -> parserUtils.parseXml(content)
+                OutputContent.JSON -> parserUtils.parseJson(content)
+            }
+            ChatMessage.Parsed(
+                outputContent = outputContent,
+                title = (parsedMessage["title"] as? String) ?: "<no title>",
+                beautifulFraming = (parsedMessage["uncode_symbols"] as? String) ?: "<no beautiful framing>",
+                message = (parsedMessage["message"] as? String) ?: "<no message>",
+            )
+        } catch (e: Exception) {
+            ChatMessage.ErrorOnParsing(outputContent, e.message ?: "unknown error")
         }
+    }
 
     val state = combine(
         inputText,
