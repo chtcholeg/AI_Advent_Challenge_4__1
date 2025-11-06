@@ -1,7 +1,5 @@
-package ru.chtcholeg.aichat.ui
+package ru.chtcholeg.aichat.ui.views
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -10,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 
@@ -47,7 +44,7 @@ fun FloatTextField(
         label = label?.let { text -> { Text(text) } },
         modifier = modifier,
         keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Decimal
+            keyboardType = KeyboardType.Companion.Decimal
         ),
         isError = error != null,
         supportingText = {

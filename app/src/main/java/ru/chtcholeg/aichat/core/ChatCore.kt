@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import ru.chtcholeg.aichat.BuildConfig
 import ru.chtcholeg.aichat.http.Message
+import ru.chtcholeg.aichat.http.Message.Role
+import ru.chtcholeg.aichat.ui.chatscreen.OutputContent
 
 object ChatCore {
     private const val CLIENT_ID = BuildConfig.CLIENT_ID
@@ -35,6 +37,12 @@ object ChatCore {
     private val _currentState = MutableStateFlow<State>(State.Stopped.Default)
     val currentState = _currentState.asStateFlow()
 
+    private val _outputContent = MutableStateFlow(OutputContent.PLAIN_TEXT)
+    val outputContent = _outputContent.asStateFlow()
+
+    private val _temperature = MutableStateFlow(1f)
+    val temperature = _temperature.asStateFlow()
+
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
     val messages = _messages.asStateFlow()
 
@@ -55,7 +63,7 @@ object ChatCore {
         }
     }
 
-    fun sendMessage(text: String, temperature: Float) {
+    fun sendMessage(text: String) {
         val newState = _currentState.updateAndGet { state ->
             if (state is State.Live.Idle) State.Live.Requesting else state
         }
@@ -69,11 +77,11 @@ object ChatCore {
 
         logicScope.launch {
             var errorMessage: String? = null
-            addMessage(role = Message.USER, text = text)
-            KtorClient.sendMessage(token, AI_MODEL, text, temperature)
+            addMessage(role = Role.USER, text = text)
+            KtorClient.send(token, AI_MODEL, getMessageListToSend(), temperature.value)
                 .onSuccess { response ->
                     val text = response.choices.firstOrNull()?.message?.content ?: "<Empty answer>"
-                    addMessage(role = Message.ASSISTANT, text = text)
+                    addMessage(role = Role.ASSISTANT, text = text)
                 }.onFailure { error ->
                     errorMessage = error.message
                 }
@@ -81,19 +89,36 @@ object ChatCore {
         }
     }
 
-    private fun addMessage(role: String, text: String) {
+    private fun addMessage(role: Role, text: String) {
         _messages.update { messages ->
-            listOf(Message(role = role, content = text)) + messages
+            messages + Message(role = role, content = text)
         }
     }
 
-    fun resetError() {
-
+    fun resetChat() {
+        _messages.value = emptyList()
     }
 
     fun refreshToken() {
         token.value = null
         receiveToken()
+    }
+
+    fun setTemperature(temperature: Float) {
+        _temperature.value = temperature
+    }
+
+    fun setOutputContent(outputContent: OutputContent) {
+        _outputContent.value = outputContent
+    }
+
+    private fun getMessageListToSend(): List<Message> {
+        val systemMessage = when (_outputContent.value) {
+            OutputContent.PLAIN_TEXT -> null
+            OutputContent.JSON -> Message(Role.SYSTEM, SystemPrompts.JSON)
+            OutputContent.XML -> Message(Role.SYSTEM, SystemPrompts.XML)
+        }
+        return listOfNotNull(systemMessage) + _messages.value
     }
 
     sealed interface State {
@@ -117,4 +142,5 @@ object ChatCore {
             }
         }
     }
+
 }
