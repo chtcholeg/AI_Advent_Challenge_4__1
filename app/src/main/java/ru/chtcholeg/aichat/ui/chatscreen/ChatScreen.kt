@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -16,10 +17,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,16 +53,8 @@ private fun ChatScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("AI Chat") },
-                actions = {
-                    IconButton(
-                        onClick = { onAction(ChatAction.ShowSettings) }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Settings"
-                        )
-                    }
-                }
+                navigationIcon = { NavigationIcon(onAction) },
+                actions = { Actions(onAction) },
             )
         },
         modifier = Modifier.fillMaxSize()
@@ -73,7 +72,12 @@ private fun ChatScreen(
                 reverseLayout = true
             ) {
                 items(count = state.messages.size) { message ->
-                    MessageBubble(chatMessage = state.messages[message])
+                    val chatMessage = state.messages[message]
+                    val context = LocalContext.current
+                    MessageBubble(
+                        chatMessage = chatMessage,
+                        onCopyClicked = { onAction(ChatAction.Copy(context, chatMessage)) },
+                    )
                 }
             }
 
@@ -106,12 +110,13 @@ private fun ChatScreen(
             // Input area
             InputArea(
                 inputText = state.inputText,
-                onInputTextChange = { onAction(ChatAction.Input(it)) },
+                onInputTextChange = {
+                    onAction(ChatAction.Input(it))
+                },
                 onSendMessage = { onAction(ChatAction.SendMessage) },
                 isLoading = state.isLoading,
                 modifier = Modifier.fillMaxWidth()
             )
-
         }
     }
 
@@ -122,6 +127,31 @@ private fun ChatScreen(
                 dialog,
             )
         }
+    }
+}
+
+@Composable
+private fun Actions(onAction: (ChatAction) -> Unit) {
+    IconButton(
+        onClick = { onAction(ChatAction.ShowSettings) }
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Settings,
+            contentDescription = "Settings"
+        )
+    }
+}
+
+@Composable
+private fun NavigationIcon(onAction: (ChatAction) -> Unit) {
+    val context = LocalContext.current
+    IconButton(
+        onClick = { onAction(ChatAction.CopyAll(context)) }
+    ) {
+        Icon(
+            imageVector = Icons.Filled.CopyAll,
+            contentDescription = "Copy all conversation"
+        )
     }
 }
 

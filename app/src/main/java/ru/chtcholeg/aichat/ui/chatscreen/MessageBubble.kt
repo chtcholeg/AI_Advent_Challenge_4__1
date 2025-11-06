@@ -1,11 +1,17 @@
 package ru.chtcholeg.aichat.ui.chatscreen
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +25,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun MessageBubble(
     chatMessage: ChatMessage,
-    modifier: Modifier = Modifier
+    onCopyClicked: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val alignment = if (chatMessage.isFromUser) Alignment.Companion.CenterEnd else Alignment.Companion.CenterStart
     val startPadding = if (chatMessage.isFromUser) 32.dp else 0.dp
@@ -42,6 +49,27 @@ fun MessageBubble(
                 is ChatMessage.Parsed -> ParsedText(chatMessage)
             }
         }
+        CopyButton(endAlignment = chatMessage.isFromUser, onClick = onCopyClicked)
+    }
+}
+
+@Composable
+private fun BoxScope.CopyButton(
+    endAlignment: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .align(if (endAlignment) Alignment.TopEnd else Alignment.TopStart)
+            .size(24.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.ContentCopy,
+            contentDescription = "Copy",
+            tint = Color.Gray,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
@@ -81,7 +109,6 @@ private fun ParsedText(chatMessage: ChatMessage.Parsed) {
             color = chatMessage.textColor,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.W200,
-
         )
         Text(
             text = chatMessage.title,
@@ -102,8 +129,9 @@ private fun ParsedText(chatMessage: ChatMessage.Parsed) {
 fun String.insertSpacesBetweenUnicode(spaceCount: Int = 1): String {
     return codePoints()
         .toArray()
-        .map { String(Character.toChars(it)) }
-        .joinToString(" ".repeat(spaceCount))
+        .joinToString(" ".repeat(spaceCount)) {
+            String(Character.toChars(it))
+        }
 }
 
 private val ChatMessage.backgroundColor: Color
@@ -124,7 +152,10 @@ private val ChatMessage.textColor: Color
 
 private val OutputContent.text: String
     get() = when (this) {
+        OutputContent.SEQUENTIAL_ASSISTANT,
+        OutputContent.FULL_FLEDGED_ASSISTANT,
         OutputContent.PLAIN_TEXT -> ""
+
         OutputContent.XML -> "XML"
         OutputContent.JSON -> "JSON"
     }

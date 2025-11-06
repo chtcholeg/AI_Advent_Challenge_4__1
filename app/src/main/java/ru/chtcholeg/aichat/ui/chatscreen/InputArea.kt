@@ -13,6 +13,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -26,13 +31,24 @@ fun InputArea(
     isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+    var currentText by remember { mutableStateOf("") }
+    LaunchedEffect(inputText) {
+        if (!isFocused) {
+            currentText = inputText
+        }
+    }
+
     Row(
         modifier = modifier.padding(16.dp),
         verticalAlignment = Alignment.Companion.CenterVertically
     ) {
         TextField(
-            value = inputText,
-            onValueChange = onInputTextChange,
+            value = currentText,
+            onValueChange = { newText ->
+                currentText = newText
+                onInputTextChange(newText)
+            },
             placeholder = { Text("Type a message...") },
             modifier = Modifier
                 .weight(1f)
