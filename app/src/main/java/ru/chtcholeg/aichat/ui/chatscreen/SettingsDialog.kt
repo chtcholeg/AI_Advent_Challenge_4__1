@@ -29,7 +29,8 @@ fun SettingsDialog(
 ) {
     BottomSheet(
         onDismissRequest = { onAction(ChatAction.HideDialog) },
-        modifier = modifier.padding(bottom = 100.dp),
+        modifier = modifier
+            .padding(bottom = 32.dp),
     ) {
         Text(
             text = "Settings",
@@ -140,6 +141,8 @@ private val OutputContent.text: String
         OutputContent.PLAIN_TEXT -> "Plain text"
         OutputContent.JSON -> "Json"
         OutputContent.XML -> "Xml"
+        OutputContent.FULL_FLEDGED_ASSISTANT -> "Full-fledged assistant"
+        OutputContent.SEQUENTIAL_ASSISTANT -> "Sequential assistant"
     }
 
 @Preview(showBackground = true)

@@ -1,5 +1,6 @@
 package ru.chtcholeg.aichat.ui.chatscreen
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,9 +15,17 @@ import kotlinx.coroutines.flow.stateIn
 import ru.chtcholeg.aichat.core.ChatCore
 import ru.chtcholeg.aichat.http.Message
 import ru.chtcholeg.aichat.http.Message.Role
+import ru.chtcholeg.aichat.utils.ClipboardUtils
 import ru.chtcholeg.aichat.utils.ParserUtils
 
-enum class OutputContent { PLAIN_TEXT, JSON, XML }
+enum class OutputContent(val isParselable: Boolean = false) {
+    PLAIN_TEXT,
+    JSON(true),
+    XML(true),
+    FULL_FLEDGED_ASSISTANT,
+    SEQUENTIAL_ASSISTANT,
+    ;
+}
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
@@ -34,18 +43,27 @@ data class ChatState(
 }
 
 sealed interface ChatMessage {
-    data class RegularMessage(val originalMessage: Message) : ChatMessage
+    val stringToCopy: String
+
+    data class RegularMessage(val originalMessage: Message) : ChatMessage {
+        override val stringToCopy: String get() = originalMessage.content
+    }
+
     data class Parsed(
         val outputContent: OutputContent,
         val title: String,
         val beautifulFraming: String,
         val message: String,
-    ) : ChatMessage
+    ) : ChatMessage {
+        override val stringToCopy: String get() = "$title\n$beautifulFraming\n$message"
+    }
 
     data class ErrorOnParsing(
         val outputContent: OutputContent,
         val message: String,
-    ) : ChatMessage
+    ) : ChatMessage {
+        override val stringToCopy: String get() = message
+    }
 }
 
 val ChatMessage.isFromUser: Boolean
@@ -64,6 +82,8 @@ sealed interface ChatAction {
     data object RefreshToken : ChatAction
     data class SetTemperature(val temperature: Float?) : ChatAction
     data class SetOutputContent(val outputContent: OutputContent) : ChatAction
+    data class Copy(val context: Context, val chatMessage: ChatMessage) : ChatAction
+    data class CopyAll(val context: Context) : ChatAction
 }
 
 class ChatViewModel : ViewModel() {
@@ -88,7 +108,7 @@ class ChatViewModel : ViewModel() {
         val result = messages.filter { it.isNotSystem }.map { ChatMessage.RegularMessage(it) }
         val parsedMessage = messages
             .lastOrNull()
-            ?.takeIf { it.role == Message.Role.ASSISTANT && outputContent != OutputContent.PLAIN_TEXT }
+            ?.takeIf { it.role == Role.ASSISTANT && outputContent.isParselable }
             ?.parse(outputContent)
 
         (result + listOfNotNull(parsedMessage)).reversed()
@@ -98,7 +118,10 @@ class ChatViewModel : ViewModel() {
         return try {
             val parserUtils = ParserUtils()
             val parsedMessage = when (outputContent) {
+                OutputContent.SEQUENTIAL_ASSISTANT,
+                OutputContent.FULL_FLEDGED_ASSISTANT,
                 OutputContent.PLAIN_TEXT -> emptyMap()
+
                 OutputContent.XML -> parserUtils.parseXml(content)
                 OutputContent.JSON -> parserUtils.parseJson(content)
             }
@@ -138,6 +161,8 @@ class ChatViewModel : ViewModel() {
             ChatAction.RefreshToken -> refreshToken()
             is ChatAction.SetTemperature -> setTemperature(action.temperature)
             is ChatAction.SetOutputContent -> setOutputContent(action.outputContent)
+            is ChatAction.Copy -> copy(action.context, action.chatMessage)
+            is ChatAction.CopyAll -> copyAll(action.context)
         }
     }
 
@@ -167,6 +192,30 @@ class ChatViewModel : ViewModel() {
 
     private fun setOutputContent(outputContent: OutputContent) {
         ChatCore.setOutputContent(outputContent)
+    }
+
+    private fun copy(context: Context, chatMessage: ChatMessage) {
+        try {
+            ClipboardUtils.copy(context, "message_content", chatMessage.stringToCopy)
+        } catch (e: Exception) {
+            android.util.Log.e("ChatViewModel", e.message ?: "unknown error")
+        }
+    }
+
+    private fun copyAll(context: Context) {
+        try {
+            val text = buildString {
+                val messages = ChatCore.messages.value.filter { it.isNotSystem }
+                messages.forEach { message ->
+                    val roleStr = message.role.toString()
+                    val text = message.content
+                    append("$roleStr:\n$text\n\n\n")
+                }
+            }
+            ClipboardUtils.copy(context, "all_messages", text)
+        } catch (e: Exception) {
+            android.util.Log.e("ChatViewModel", e.message ?: "unknown error")
+        }
     }
 
     private fun createSettingsDialogFlow() = combine(

@@ -117,6 +117,8 @@ object ChatCore {
             OutputContent.PLAIN_TEXT -> null
             OutputContent.JSON -> Message(Role.SYSTEM, SystemPrompts.JSON)
             OutputContent.XML -> Message(Role.SYSTEM, SystemPrompts.XML)
+            OutputContent.FULL_FLEDGED_ASSISTANT -> Message(Role.SYSTEM, SystemPrompts.FULL_FLEDGED_ASSISTANT)
+            OutputContent.SEQUENTIAL_ASSISTANT -> Message(Role.SYSTEM, SystemPrompts.SEQUENTIAL_ASSISTANT)
         }
         return listOfNotNull(systemMessage) + _messages.value
     }
