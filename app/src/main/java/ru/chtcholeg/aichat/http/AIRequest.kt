@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AIRequest(
     val model: String,
-    val messages: List<Message>,
+    val messages: List<ApiMessage>,
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,

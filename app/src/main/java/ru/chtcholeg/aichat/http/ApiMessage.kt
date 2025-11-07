@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Message(
+data class ApiMessage(
     val role: Role, // system, user, assistant, function
     val content: String,
 ) {

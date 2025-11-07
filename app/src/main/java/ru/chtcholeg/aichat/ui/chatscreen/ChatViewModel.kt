@@ -11,87 +11,95 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import ru.chtcholeg.aichat.core.ChatCore
-import ru.chtcholeg.aichat.http.Message
-import ru.chtcholeg.aichat.http.Message.Role
+import ru.chtcholeg.aichat.core.AgentHolder
+import ru.chtcholeg.aichat.core.AiApi
+import ru.chtcholeg.aichat.core.CompositeAgent
+import ru.chtcholeg.aichat.core.ResponseFormat
+import ru.chtcholeg.aichat.core.SingleAgent
+import ru.chtcholeg.aichat.http.ApiMessage
+import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTION_EXAMPLE
+import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.utils.ClipboardUtils
 import ru.chtcholeg.aichat.utils.ParserUtils
-
-enum class OutputContent(val isParselable: Boolean = false) {
-    PLAIN_TEXT,
-    JSON(true),
-    XML(true),
-    FULL_FLEDGED_ASSISTANT,
-    SEQUENTIAL_ASSISTANT,
-    ;
-}
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val inputText: String = "",
+    val shouldSetFocusOnInput: Boolean = false,
     val dialog: Dialog? = null,
 ) {
     sealed interface Dialog {
         data class Settings(
             val temperature: Float = 1f,
-            val outputContent: OutputContent = OutputContent.PLAIN_TEXT,
-        ) : Dialog
+            val selectedTab: Tab = Tab.SingleAgents,
+            val selectedAgent: Agent = Agent.Single(),
+        ) : Dialog {
+            sealed interface Tab {
+                data object SingleAgents : Tab {
+                    val items = listOf(
+                        SingleAgent.Type.Regular,
+                        SingleAgent.Type.Json(JSON_DESCRIPTION_EXAMPLE),
+                        SingleAgent.Type.Xml(XML_DESCRIPTION_EXAMPLE),
+                        SingleAgent.Type.FullFledgedAssistant,
+                        SingleAgent.Type.SequentialAssistant,
+                    )
+                }
+
+                data object CompositeAgents : Tab {
+                    val items = listOf(
+                        CompositeAgent.Type.SEPARATE_TASK_SOLVER,
+                        CompositeAgent.Type.SEVERAL_TASK_SOLVERS,
+                    )
+                }
+            }
+
+            sealed interface Agent {
+                data class Single(val type: SingleAgent.Type = SingleAgent.Type.Regular) : Agent
+                data class Composite(val type: CompositeAgent.Type = CompositeAgent.Type.SEPARATE_TASK_SOLVER) : Agent
+            }
+        }
     }
 }
-
-sealed interface ChatMessage {
-    val stringToCopy: String
-
-    data class RegularMessage(val originalMessage: Message) : ChatMessage {
-        override val stringToCopy: String get() = originalMessage.content
-    }
-
-    data class Parsed(
-        val outputContent: OutputContent,
-        val title: String,
-        val beautifulFraming: String,
-        val message: String,
-    ) : ChatMessage {
-        override val stringToCopy: String get() = "$title\n$beautifulFraming\n$message"
-    }
-
-    data class ErrorOnParsing(
-        val outputContent: OutputContent,
-        val message: String,
-    ) : ChatMessage {
-        override val stringToCopy: String get() = message
-    }
-}
-
-val ChatMessage.isFromUser: Boolean
-    get() = if (this is ChatMessage.RegularMessage) {
-        originalMessage.role == Role.USER
-    } else {
-        false
-    }
 
 sealed interface ChatAction {
     data object SendMessage : ChatAction
     data class Input(val text: String) : ChatAction
+    data object ResetNeedForInputFocus : ChatAction
     data object ResetChat : ChatAction
     data object HideDialog : ChatAction
     data object ShowSettings : ChatAction
     data object RefreshToken : ChatAction
     data class SetTemperature(val temperature: Float?) : ChatAction
-    data class SetOutputContent(val outputContent: OutputContent) : ChatAction
+    data class SelectTab(val tab: ChatState.Dialog.Settings.Tab) : ChatAction
+    data class SetSingleAgent(val type: SingleAgent.Type) : ChatAction
+    data class SetCompositeAgent(val type: CompositeAgent.Type) : ChatAction
     data class Copy(val context: Context, val chatMessage: ChatMessage) : ChatAction
     data class CopyAll(val context: Context) : ChatAction
 }
 
 class ChatViewModel : ViewModel() {
     private val inputText = MutableStateFlow("")
+    private val shouldSetFocusOnInput = MutableStateFlow(false)
 
     private val logicScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private val dialogType = MutableStateFlow<DialogType>(DialogType.NO)
+
+    private val selectedSettingsAgentsTab =
+        MutableStateFlow<ChatState.Dialog.Settings.Tab>(ChatState.Dialog.Settings.Tab.SingleAgents)
+
+    private val selectedAgentItem: Flow<ChatState.Dialog.Settings.Agent> = AgentHolder.agent
+        .map { aiAgent ->
+            when (aiAgent) {
+                is SingleAgent -> ChatState.Dialog.Settings.Agent.Single(aiAgent.type)
+                is CompositeAgent -> ChatState.Dialog.Settings.Agent.Composite(aiAgent.type)
+                else -> throw RuntimeException("Unknown agent type ($aiAgent)")
+            }
+        }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val dialog = dialogType.flatMapLatest { dialogType ->
@@ -102,51 +110,54 @@ class ChatViewModel : ViewModel() {
     }
 
     private val messages: Flow<List<ChatMessage>> = combine(
-        ChatCore.messages,
-        ChatCore.outputContent
-    ) { messages, outputContent ->
-        val result = messages.filter { it.isNotSystem }.map { ChatMessage.RegularMessage(it) }
+        AgentHolder.messages,
+        selectedAgentItem,
+    ) { messages, selectedAgentItem ->
+        val result = messages
+            .filter { it.isNotSystemPrompt }
+            .map { ChatMessage.RegularMessage(it) }
         val parsedMessage = messages
             .lastOrNull()
-            ?.takeIf { it.role == Role.ASSISTANT && outputContent.isParselable }
-            ?.parse(outputContent)
+            ?.let {
+                if (it.expectedFormat == ResponseFormat.PLAIN_TEXT) return@let null
+                it.originalApiMessage?.parse(it.expectedFormat)
+            }
 
         (result + listOfNotNull(parsedMessage)).reversed()
     }
 
-    private fun Message.parse(outputContent: OutputContent): ChatMessage {
+    private fun ApiMessage.parse(format: ResponseFormat): ChatMessage {
         return try {
             val parserUtils = ParserUtils()
-            val parsedMessage = when (outputContent) {
-                OutputContent.SEQUENTIAL_ASSISTANT,
-                OutputContent.FULL_FLEDGED_ASSISTANT,
-                OutputContent.PLAIN_TEXT -> emptyMap()
-
-                OutputContent.XML -> parserUtils.parseXml(content)
-                OutputContent.JSON -> parserUtils.parseJson(content)
+            val parsedMessage = when (format) {
+                ResponseFormat.XML -> parserUtils.parseXml(content)
+                ResponseFormat.JSON -> parserUtils.parseJson(content)
+                ResponseFormat.PLAIN_TEXT -> emptyMap()
             }
             ChatMessage.Parsed(
-                outputContent = outputContent,
+                format = format,
                 title = (parsedMessage["title"] as? String) ?: "<no title>",
                 beautifulFraming = (parsedMessage["uncode_symbols"] as? String) ?: "<no beautiful framing>",
                 message = (parsedMessage["message"] as? String) ?: "<no message>",
             )
         } catch (e: Exception) {
-            ChatMessage.ErrorOnParsing(outputContent, e.message ?: "unknown error")
+            ChatMessage.ErrorOnParsing(format, e.message ?: "unknown error")
         }
     }
 
     val state = combine(
         inputText,
+        shouldSetFocusOnInput,
         dialog,
-        ChatCore.currentState,
+        AiApi.currentState,
         messages,
-    ) { inputText, dialog, coreState, messages ->
+    ) { inputText, shouldSetFocusOnInput, dialog, coreState, messages ->
         ChatState(
             messages = messages,
             isLoading = coreState.isLoading,
             error = coreState.error,
             inputText = inputText,
+            shouldSetFocusOnInput = shouldSetFocusOnInput,
             dialog = dialog,
         )
     }.stateIn(logicScope, SharingStarted.Companion.WhileSubscribed(5000), ChatState())
@@ -155,12 +166,15 @@ class ChatViewModel : ViewModel() {
         when (action) {
             ChatAction.SendMessage -> sendMessage()
             is ChatAction.Input -> updateInputText(action.text)
+            ChatAction.ResetNeedForInputFocus -> resetNeedForInputFocus()
             ChatAction.HideDialog -> dialogType.value = DialogType.NO
             ChatAction.ShowSettings -> dialogType.value = DialogType.SETTINGS
             ChatAction.ResetChat -> resetChat()
             ChatAction.RefreshToken -> refreshToken()
             is ChatAction.SetTemperature -> setTemperature(action.temperature)
-            is ChatAction.SetOutputContent -> setOutputContent(action.outputContent)
+            is ChatAction.SelectTab -> selectSettingsAgentsTab(action.tab)
+            is ChatAction.SetSingleAgent -> setSingleAgent(action.type)
+            is ChatAction.SetCompositeAgent -> setCompositeAgent(action.type)
             is ChatAction.Copy -> copy(action.context, action.chatMessage)
             is ChatAction.CopyAll -> copyAll(action.context)
         }
@@ -170,28 +184,41 @@ class ChatViewModel : ViewModel() {
         inputText.value = text
     }
 
+    private fun resetNeedForInputFocus() {
+        shouldSetFocusOnInput.value = false
+    }
+
     private fun sendMessage() {
         val messageText = inputText.value.trim()
         if (messageText.isBlank()) return
 
         inputText.value = ""
-        ChatCore.sendMessage(messageText)
+        shouldSetFocusOnInput.value = true
+        AgentHolder.processUserRequest(messageText)
     }
 
     private fun resetChat() {
-        ChatCore.resetChat()
+        AgentHolder.resetCurrentChat()
     }
 
     private fun refreshToken() {
-        ChatCore.refreshToken()
+        AiApi.refreshToken()
     }
 
     private fun setTemperature(temperature: Float?) {
-        ChatCore.setTemperature(temperature ?: 1.0f)
+        AgentHolder.setTemperature(temperature ?: 1.0f)
     }
 
-    private fun setOutputContent(outputContent: OutputContent) {
-        ChatCore.setOutputContent(outputContent)
+    private fun selectSettingsAgentsTab(tab: ChatState.Dialog.Settings.Tab) {
+        selectedSettingsAgentsTab.value = tab
+    }
+
+    private fun setSingleAgent(aiAnswer: SingleAgent.Type) {
+        AgentHolder.setSingleAgent(aiAnswer)
+    }
+
+    private fun setCompositeAgent(type: CompositeAgent.Type) {
+        AgentHolder.setCompositeAgent(type)
     }
 
     private fun copy(context: Context, chatMessage: ChatMessage) {
@@ -205,10 +232,11 @@ class ChatViewModel : ViewModel() {
     private fun copyAll(context: Context) {
         try {
             val text = buildString {
-                val messages = ChatCore.messages.value.filter { it.isNotSystem }
+                val aiAgent = AgentHolder.agent.value
+                val messages = aiAgent.messages.value.filter { it.isNotSystemPrompt }
                 messages.forEach { message ->
-                    val roleStr = message.role.toString()
-                    val text = message.content
+                    val roleStr = message.originalApiMessage?.role?.toString() ?: "<unknown>"
+                    val text = message.originalApiMessage?.content ?: "<no content>"
                     append("$roleStr:\n$text\n\n\n")
                 }
             }
@@ -219,14 +247,26 @@ class ChatViewModel : ViewModel() {
     }
 
     private fun createSettingsDialogFlow() = combine(
-        ChatCore.temperature,
-        ChatCore.outputContent,
-    ) { temperature, outputContent ->
-        ChatState.Dialog.Settings(
-            temperature,
-            outputContent,
-        )
+        AgentHolder.temperature,
+        selectedSettingsAgentsTab,
+        selectedAgentItem,
+    ) { temperature, selectedTab, selectedAgent ->
+        ChatState.Dialog.Settings(temperature, selectedTab, selectedAgent)
     }
 
     private enum class DialogType { NO, SETTINGS }
+
+    companion object {
+        const val JSON_DESCRIPTION_EXAMPLE = "{\n" +
+                "  \"title\": \"заголовок твоего ответа в виде одной короткой строки - выжимки из вопроса\",\n" +
+                "  \"message\": \"основной ответ\",\n" +
+                "  \"uncode_symbols\": \"строка из нескольких (3-5) юникодных символов-картинок, которые имеют какое-то отношение к запросу\"" +
+                "}"
+
+        const val XML_DESCRIPTION_EXAMPLE = "<response>\n" +
+                "  <title>заголовок твоего ответа в виде одной короткой строки - выжимки из вопроса</title>\n" +
+                "  <message>основной ответ</apiMessage>\n" +
+                "  <uncode_symbols>строка из нескольких (3-5) юникодных символов-картинок, которые имеют какое-то отношение к запросу</uncode_symbols>\n" +
+                "</response>"
+    }
 }

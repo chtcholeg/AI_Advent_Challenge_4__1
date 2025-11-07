@@ -18,11 +18,13 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.parametersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.chtcholeg.aichat.http.AIRequest
-import ru.chtcholeg.aichat.http.AIResponse
-import ru.chtcholeg.aichat.http.Message
+import ru.chtcholeg.aichat.http.AiResponse
+import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.OAuthResponse
 import java.security.cert.X509Certificate
 import java.util.UUID
@@ -94,13 +96,13 @@ object KtorClient {
     suspend fun send(
         token: String,
         model: String,
-        messages: List<Message>,
+        apiMessages: List<ApiMessage>,
         temperature: Float
-    ): Result<AIResponse> {
-        return try {
+    ): Result<AiResponse> = withContext(Dispatchers.IO) {
+        return@withContext try {
             val aiRequest = AIRequest(
                 model = model,
-                messages = messages,
+                messages = apiMessages,
                 temperature = temperature,
             )
             instance.post("$API_BASE_URL/chat/completions") {

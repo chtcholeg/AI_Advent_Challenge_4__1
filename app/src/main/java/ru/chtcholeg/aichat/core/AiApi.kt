@@ -1,5 +1,6 @@
 package ru.chtcholeg.aichat.core
 
+import KtorClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -12,16 +13,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import ru.chtcholeg.aichat.BuildConfig
-import ru.chtcholeg.aichat.http.Message
-import ru.chtcholeg.aichat.http.Message.Role
-import ru.chtcholeg.aichat.ui.chatscreen.OutputContent
+import ru.chtcholeg.aichat.http.AiResponse
+import ru.chtcholeg.aichat.http.ApiMessage
 
-object ChatCore {
+object AiApi {
     private const val CLIENT_ID = BuildConfig.CLIENT_ID
     private const val CLIENT_SECRET = BuildConfig.CLIENT_SECRET
     private const val AI_MODEL = "GigaChat"
 
     private val logicScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
     private val token = MutableStateFlow<String?>(null).apply {
         filter { token -> token != null }.onEach {
             _currentState.update { state ->
@@ -37,16 +38,7 @@ object ChatCore {
     private val _currentState = MutableStateFlow<State>(State.Stopped.Default)
     val currentState = _currentState.asStateFlow()
 
-    private val _outputContent = MutableStateFlow(OutputContent.PLAIN_TEXT)
-    val outputContent = _outputContent.asStateFlow()
-
-    private val _temperature = MutableStateFlow(1f)
-    val temperature = _temperature.asStateFlow()
-
-    private val _messages = MutableStateFlow<List<Message>>(emptyList())
-    val messages = _messages.asStateFlow()
-
-    fun initChat() {
+    fun init() {
         if (_currentState.compareAndSet(State.Stopped.Default, State.Stopped.Starting)) {
             receiveToken()
         }
@@ -63,65 +55,37 @@ object ChatCore {
         }
     }
 
-    fun sendMessage(text: String) {
-        val newState = _currentState.updateAndGet { state ->
-            if (state is State.Live.Idle) State.Live.Requesting else state
-        }
-        if (newState !is State.Live.Requesting) return
-
-        val token = token.value
-        if (token == null) {
-            _currentState.compareAndSet(State.Live.Requesting, State.Stopped.CriticalError("No token"))
-            return
-        }
-
-        logicScope.launch {
-            var errorMessage: String? = null
-            addMessage(role = Role.USER, text = text)
-            KtorClient.send(token, AI_MODEL, getMessageListToSend(), temperature.value)
-                .onSuccess { response ->
-                    val text = response.choices.firstOrNull()?.message?.content ?: "<Empty answer>"
-                    addMessage(role = Role.ASSISTANT, text = text)
-                }.onFailure { error ->
-                    errorMessage = error.message
-                }
-            _currentState.compareAndSet(State.Live.Requesting, State.Live.Idle(errorMessage))
-        }
-    }
-
-    private fun addMessage(role: Role, text: String) {
-        _messages.update { messages ->
-            messages + Message(role = role, content = text)
-        }
-    }
-
-    fun resetChat() {
-        _messages.value = emptyList()
-    }
-
     fun refreshToken() {
         token.value = null
         receiveToken()
     }
 
-    fun setTemperature(temperature: Float) {
-        _temperature.value = temperature
-    }
-
-    fun setOutputContent(outputContent: OutputContent) {
-        _outputContent.value = outputContent
-    }
-
-    private fun getMessageListToSend(): List<Message> {
-        val systemMessage = when (_outputContent.value) {
-            OutputContent.PLAIN_TEXT -> null
-            OutputContent.JSON -> Message(Role.SYSTEM, SystemPrompts.JSON)
-            OutputContent.XML -> Message(Role.SYSTEM, SystemPrompts.XML)
-            OutputContent.FULL_FLEDGED_ASSISTANT -> Message(Role.SYSTEM, SystemPrompts.FULL_FLEDGED_ASSISTANT)
-            OutputContent.SEQUENTIAL_ASSISTANT -> Message(Role.SYSTEM, SystemPrompts.SEQUENTIAL_ASSISTANT)
+    suspend fun processUserRequest(apiMessages: List<ApiMessage>, temperature: Float): Result<String> {
+        val newState = _currentState.updateAndGet { state ->
+            if (state is State.Live.Idle) State.Live.Requesting else state
         }
-        return listOfNotNull(systemMessage) + _messages.value
+        if (newState !is State.Live.Requesting) return Result.failure(ApiIsBusyException())
+
+        val token = token.value
+        if (token == null) {
+            _currentState.compareAndSet(State.Live.Requesting, State.Stopped.CriticalError("No token"))
+            return Result.failure(TokenIsNullException())
+        }
+
+        val result = KtorClient.send(token, AI_MODEL, apiMessages, temperature)
+        val errorMessage = result.exceptionOrNull()?.message
+        _currentState.compareAndSet(State.Live.Requesting, State.Live.Idle(errorMessage))
+        return result.extractContent()
     }
+
+    fun Result<AiResponse>.extractContent() = if (isFailure) {
+        Result.failure(exceptionOrNull()!!)
+    } else {
+        Result.success(getOrNull()?.choices?.firstOrNull()?.message?.content.orEmpty())
+    }
+
+    class ApiIsBusyException : Exception("Request can't be completed because of processing of another request")
+    class TokenIsNullException : Exception("Valid token wasn't received")
 
     sealed interface State {
         val isLoading: Boolean get() = false
@@ -144,5 +108,4 @@ object ChatCore {
             }
         }
     }
-
 }

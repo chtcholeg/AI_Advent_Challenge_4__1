@@ -1,8 +1,8 @@
 package ru.chtcholeg.aichat.ui.views
 
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +23,7 @@ fun FloatTextField(
     }
     var error by remember { mutableStateOf<String?>(null) }
 
-    TextField(
+    OutlinedTextField(
         value = textValue,
         onValueChange = { newText ->
             textValue = newText
@@ -31,7 +31,7 @@ fun FloatTextField(
 
             if (newText.isEmpty()) {
                 onValueChange(null)
-                return@TextField
+                return@OutlinedTextField
             }
 
             try {

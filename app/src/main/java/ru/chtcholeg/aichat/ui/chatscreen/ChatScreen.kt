@@ -17,14 +17,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
@@ -110,11 +105,11 @@ private fun ChatScreen(
             // Input area
             InputArea(
                 inputText = state.inputText,
-                onInputTextChange = {
-                    onAction(ChatAction.Input(it))
-                },
+                onInputTextChange = { onAction(ChatAction.Input(it)) },
+                onFocusRequested = { onAction(ChatAction.ResetNeedForInputFocus) },
                 onSendMessage = { onAction(ChatAction.SendMessage) },
                 isLoading = state.isLoading,
+                shouldFocus = state.shouldSetFocusOnInput,
                 modifier = Modifier.fillMaxWidth()
             )
         }
