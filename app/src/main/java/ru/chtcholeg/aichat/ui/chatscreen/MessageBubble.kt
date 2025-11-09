@@ -76,11 +76,23 @@ private fun BoxScope.CopyButton(
 
 @Composable
 private fun SimpleText(chatMessage: ChatMessage.RegularMessage) {
-    Text(
-        text = chatMessage.originalMessage.originalApiMessage?.content ?: "<no content>",
-        color = chatMessage.textColor,
-        modifier = Modifier.padding(all = 16.dp)
-    )
+    Column(
+    ) {
+        chatMessage.originalMessage.displayableTitle?.let { title ->
+            Text(
+                text = title,
+                color = chatMessage.textColor,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.W200,
+                modifier = Modifier.padding(start = 32.dp)
+            )
+        }
+        Text(
+            text = chatMessage.originalMessage.content ?: "<no content>",
+            color = chatMessage.textColor,
+            modifier = Modifier.padding(all = 16.dp)
+        )
+    }
 }
 
 @Composable

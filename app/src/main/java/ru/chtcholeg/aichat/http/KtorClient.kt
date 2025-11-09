@@ -19,6 +19,7 @@ import io.ktor.http.contentType
 import io.ktor.http.parametersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -34,7 +35,8 @@ object KtorClient {
     private const val TOKEN_RECEIVING_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     private const val API_BASE_URL = "https://gigachat.devices.sberbank.ru/api/v1"
 
-    private const val ROLE_USER = "user"
+    private const val SEND_DELAY_MS = 1000L
+    private var lastSendTimeMs = 0L
 
     val instance = HttpClient(CIO) {
         // JSON serialization
@@ -99,6 +101,13 @@ object KtorClient {
         apiMessages: List<ApiMessage>,
         temperature: Float
     ): Result<AiResponse> = withContext(Dispatchers.IO) {
+        val nowMs = System.currentTimeMillis()
+        val durationMs = nowMs - lastSendTimeMs
+        if (durationMs < SEND_DELAY_MS) {
+            delay(SEND_DELAY_MS - durationMs)
+        }
+        lastSendTimeMs = nowMs
+
         return@withContext try {
             val aiRequest = AIRequest(
                 model = model,

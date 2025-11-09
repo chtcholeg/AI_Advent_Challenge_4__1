@@ -41,7 +41,7 @@ object AgentHolder {
     }
 
     fun processUserRequest(message: String) {
-        agent.value.processUserRequest(message)
+        agent.value.launchProcessingUserRequest(message)
     }
 
     private fun Agent.isSame(type: SingleAgent.Type) = (this as? SingleAgent)?.type == type

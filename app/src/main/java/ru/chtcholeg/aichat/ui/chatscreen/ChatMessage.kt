@@ -7,8 +7,10 @@ import ru.chtcholeg.aichat.http.ApiMessage.Role
 sealed interface ChatMessage {
     val stringToCopy: String
 
-    data class RegularMessage(val originalMessage: Message) : ChatMessage {
-        override val stringToCopy: String get() = originalMessage.originalApiMessage?.content ?: "<no content>"
+    data class RegularMessage(
+        val originalMessage: Message,
+    ) : ChatMessage {
+        override val stringToCopy: String get() = originalMessage.content ?: "<no content>"
     }
 
     data class Parsed(

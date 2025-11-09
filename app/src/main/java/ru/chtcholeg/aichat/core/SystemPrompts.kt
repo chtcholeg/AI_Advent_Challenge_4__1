@@ -1,6 +1,7 @@
 package ru.chtcholeg.aichat.core
 
 object SystemPrompts {
+
     private const val JSON_TEMPLATE =
         "Ты должен ВСЕГДА отвечать ТОЛЬКО в формате JSON. Любой другой формат ответа запрещен.\n" +
                 "- Ответ должен быть ВАЛИДНЫМ JSON объектом\n" +
@@ -24,6 +25,9 @@ object SystemPrompts {
                 "\n" +
                 "Структура ответа ДОЛЖНА быть такой:\n" +
                 "<{xml_description}>"
+
+    const val STEP_BY_STEP_SOLVER =
+        "Ты должен решать пославленную пользователем проблему ПОШАГОВО (каждый шаг надо расписывать)"
 
     const val FULL_FLEDGED_ASSISTANT =
         "Ты - полноценный AI-помощник (например, для создания технических заданий). \n" +

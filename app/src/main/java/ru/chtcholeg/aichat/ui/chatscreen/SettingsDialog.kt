@@ -231,6 +231,8 @@ private fun AgentItem(
 private val SingleAgent.Type.text: String
     get() = when (this) {
         SingleAgent.Type.Regular -> "Returns plain text"
+        SingleAgent.Type.StepByStepSolver -> "Solves the problem step by step"
+        is SingleAgent.Type.Custom -> "Customizable"
         is SingleAgent.Type.Json -> "Returns JSON (fields hardcoded)"
         is SingleAgent.Type.Xml -> "Returns XML (fields hardcoded)"
         SingleAgent.Type.FullFledgedAssistant -> "Asks the questions at once"
@@ -239,8 +241,7 @@ private val SingleAgent.Type.text: String
 
 private val CompositeAgent.Type.text: String
     get() = when (this) {
-        CompositeAgent.Type.SEPARATE_TASK_SOLVER -> "One task setter, one task solver"
-        CompositeAgent.Type.SEVERAL_TASK_SOLVERS -> "One task setter, several experts"
+        CompositeAgent.Type.SeveralTaskSolvers -> "Several experts"
     }
 
 @Preview(showBackground = true)

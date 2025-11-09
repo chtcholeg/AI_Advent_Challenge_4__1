@@ -42,6 +42,7 @@ data class ChatState(
                 data object SingleAgents : Tab {
                     val items = listOf(
                         SingleAgent.Type.Regular,
+                        SingleAgent.Type.StepByStepSolver,
                         SingleAgent.Type.Json(JSON_DESCRIPTION_EXAMPLE),
                         SingleAgent.Type.Xml(XML_DESCRIPTION_EXAMPLE),
                         SingleAgent.Type.FullFledgedAssistant,
@@ -51,15 +52,14 @@ data class ChatState(
 
                 data object CompositeAgents : Tab {
                     val items = listOf(
-                        CompositeAgent.Type.SEPARATE_TASK_SOLVER,
-                        CompositeAgent.Type.SEVERAL_TASK_SOLVERS,
+                        CompositeAgent.Type.SeveralTaskSolvers,
                     )
                 }
             }
 
             sealed interface Agent {
                 data class Single(val type: SingleAgent.Type = SingleAgent.Type.Regular) : Agent
-                data class Composite(val type: CompositeAgent.Type = CompositeAgent.Type.SEPARATE_TASK_SOLVER) : Agent
+                data class Composite(val type: CompositeAgent.Type = CompositeAgent.Type.SeveralTaskSolvers) : Agent
             }
         }
     }
@@ -114,7 +114,7 @@ class ChatViewModel : ViewModel() {
         selectedAgentItem,
     ) { messages, selectedAgentItem ->
         val result = messages
-            .filter { it.isNotSystemPrompt }
+            .filter { !it.isSystemPrompt }
             .map { ChatMessage.RegularMessage(it) }
         val parsedMessage = messages
             .lastOrNull()
@@ -128,10 +128,9 @@ class ChatViewModel : ViewModel() {
 
     private fun ApiMessage.parse(format: ResponseFormat): ChatMessage {
         return try {
-            val parserUtils = ParserUtils()
             val parsedMessage = when (format) {
-                ResponseFormat.XML -> parserUtils.parseXml(content)
-                ResponseFormat.JSON -> parserUtils.parseJson(content)
+                ResponseFormat.XML -> ParserUtils.parseXml(content)
+                ResponseFormat.JSON -> ParserUtils.parseJson(content)
                 ResponseFormat.PLAIN_TEXT -> emptyMap()
             }
             ChatMessage.Parsed(
@@ -233,10 +232,10 @@ class ChatViewModel : ViewModel() {
         try {
             val text = buildString {
                 val aiAgent = AgentHolder.agent.value
-                val messages = aiAgent.messages.value.filter { it.isNotSystemPrompt }
+                val messages = aiAgent.messages.value.filter { !it.isSystemPrompt }
                 messages.forEach { message ->
                     val roleStr = message.originalApiMessage?.role?.toString() ?: "<unknown>"
-                    val text = message.originalApiMessage?.content ?: "<no content>"
+                    val text = message.content ?: "<no content>"
                     append("$roleStr:\n$text\n\n\n")
                 }
             }
