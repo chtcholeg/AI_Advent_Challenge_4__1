@@ -18,11 +18,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.parametersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ru.chtcholeg.aichat.http.AIRequest
-import ru.chtcholeg.aichat.http.AIResponse
-import ru.chtcholeg.aichat.http.Message
+import ru.chtcholeg.aichat.http.AiResponse
+import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.OAuthResponse
 import java.security.cert.X509Certificate
 import java.util.UUID
@@ -32,7 +35,8 @@ object KtorClient {
     private const val TOKEN_RECEIVING_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     private const val API_BASE_URL = "https://gigachat.devices.sberbank.ru/api/v1"
 
-    private const val ROLE_USER = "user"
+    private const val SEND_DELAY_MS = 1000L
+    private var lastSendTimeMs = 0L
 
     val instance = HttpClient(CIO) {
         // JSON serialization
@@ -94,13 +98,20 @@ object KtorClient {
     suspend fun send(
         token: String,
         model: String,
-        messages: List<Message>,
+        apiMessages: List<ApiMessage>,
         temperature: Float
-    ): Result<AIResponse> {
-        return try {
+    ): Result<AiResponse> = withContext(Dispatchers.IO) {
+        val nowMs = System.currentTimeMillis()
+        val durationMs = nowMs - lastSendTimeMs
+        if (durationMs < SEND_DELAY_MS) {
+            delay(SEND_DELAY_MS - durationMs)
+        }
+        lastSendTimeMs = nowMs
+
+        return@withContext try {
             val aiRequest = AIRequest(
                 model = model,
-                messages = messages,
+                messages = apiMessages,
                 temperature = temperature,
             )
             instance.post("$API_BASE_URL/chat/completions") {

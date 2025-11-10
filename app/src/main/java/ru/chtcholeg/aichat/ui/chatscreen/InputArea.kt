@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
@@ -27,15 +29,27 @@ import androidx.compose.ui.unit.dp
 fun InputArea(
     inputText: String,
     onInputTextChange: (String) -> Unit,
+    onFocusRequested: () -> Unit,
     onSendMessage: () -> Unit,
     isLoading: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    shouldFocus: Boolean = false,
 ) {
+    // Text updating
     var isFocused by remember { mutableStateOf(false) }
     var currentText by remember { mutableStateOf("") }
     LaunchedEffect(inputText) {
         if (!isFocused) {
             currentText = inputText
+        }
+    }
+
+    // Focus
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(shouldFocus, isLoading) {
+        if (shouldFocus && !isLoading) {
+            focusRequester.requestFocus()
+            onFocusRequested()
         }
     }
 
@@ -52,7 +66,8 @@ fun InputArea(
             placeholder = { Text("Type a message...") },
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 8.dp),
+                .padding(end = 8.dp)
+                .focusRequester(focusRequester),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Companion.Send),
             keyboardActions = KeyboardActions(
                 onSend = {

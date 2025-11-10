@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ru.chtcholeg.aichat.core.ResponseFormat
 
 @Composable
 fun MessageBubble(
@@ -75,11 +76,23 @@ private fun BoxScope.CopyButton(
 
 @Composable
 private fun SimpleText(chatMessage: ChatMessage.RegularMessage) {
-    Text(
-        text = chatMessage.originalMessage.content,
-        color = chatMessage.textColor,
-        modifier = Modifier.padding(all = 16.dp)
-    )
+    Column(
+    ) {
+        chatMessage.originalMessage.displayableTitle?.let { title ->
+            Text(
+                text = title,
+                color = chatMessage.textColor,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.W200,
+                modifier = Modifier.padding(start = 32.dp)
+            )
+        }
+        Text(
+            text = chatMessage.originalMessage.content ?: "<no content>",
+            color = chatMessage.textColor,
+            modifier = Modifier.padding(all = 16.dp)
+        )
+    }
 }
 
 @Composable
@@ -88,7 +101,7 @@ private fun ErrorText(chatMessage: ChatMessage.ErrorOnParsing) {
         modifier = Modifier.padding(all = 16.dp)
     ) {
         Text(
-            text = chatMessage.outputContent.text,
+            text = chatMessage.format.text,
             color = chatMessage.textColor,
             fontWeight = FontWeight.W200,
         )
@@ -105,7 +118,7 @@ private fun ParsedText(chatMessage: ChatMessage.Parsed) {
         modifier = Modifier.padding(all = 16.dp)
     ) {
         Text(
-            text = chatMessage.outputContent.text,
+            text = chatMessage.format.text,
             color = chatMessage.textColor,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.W200,
@@ -150,12 +163,9 @@ private val ChatMessage.textColor: Color
         else -> MaterialTheme.colorScheme.onErrorContainer
     }
 
-private val OutputContent.text: String
+private val ResponseFormat.text: String
     get() = when (this) {
-        OutputContent.SEQUENTIAL_ASSISTANT,
-        OutputContent.FULL_FLEDGED_ASSISTANT,
-        OutputContent.PLAIN_TEXT -> ""
-
-        OutputContent.XML -> "XML"
-        OutputContent.JSON -> "JSON"
+        ResponseFormat.XML -> "XML"
+        ResponseFormat.JSON -> "JSON"
+        ResponseFormat.PLAIN_TEXT -> ""
     }

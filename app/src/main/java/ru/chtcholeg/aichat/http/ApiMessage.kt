@@ -4,11 +4,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Message(
+data class ApiMessage(
     val role: Role, // system, user, assistant, function
     val content: String,
 ) {
-    val isNotSystem: Boolean get() = role == Role.USER || role == Role.ASSISTANT
+    val isSystemPrompt: Boolean get() = role == Role.SYSTEM
+    val isUserRequest: Boolean get() = role == Role.USER
 
     @Serializable
     enum class Role {

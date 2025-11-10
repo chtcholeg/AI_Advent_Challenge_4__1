@@ -5,12 +5,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Choice(
-    val message: Message,
+    val message: ApiMessage,
     @SerialName("finish_reason")  val finishReason: String,
 )
 
 @Serializable
-data class AIResponse(
+data class AiResponse(
     val choices: List<Choice>,
     val created: Long,
 )

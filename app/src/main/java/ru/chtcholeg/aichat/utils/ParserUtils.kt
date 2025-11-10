@@ -5,7 +5,7 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
 
-class ParserUtils {
+object ParserUtils {
 
     fun parseJson(jsonString: String): Map<String, Any?> {
         val result = mutableMapOf<String, Any>()
