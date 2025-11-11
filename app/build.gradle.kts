@@ -18,8 +18,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "CLIENT_ID", "\"${System.getenv("GIGACHAT_CLIENT_ID") ?: ""}\"")
-        buildConfigField("String", "CLIENT_SECRET", "\"${System.getenv("GIGACHAT_CLIENT_SECRET") ?: ""}\"")
+        buildConfigField("String", "GIGACHAT_CLIENT_ID", "\"${System.getenv("GIGACHAT_CLIENT_ID") ?: ""}\"")
+        buildConfigField("String", "GIGACHAT_CLIENT_SECRET", "\"${System.getenv("GIGACHAT_CLIENT_SECRET") ?: ""}\"")
     }
 
     buildTypes {

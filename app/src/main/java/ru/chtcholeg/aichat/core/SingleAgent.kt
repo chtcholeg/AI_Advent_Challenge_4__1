@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import ru.chtcholeg.aichat.core.Agent.Companion.DEFAULT_TEMPERATURE
+import ru.chtcholeg.aichat.core.api.AiApiHolder
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.ApiMessage.Role
 
@@ -38,7 +39,7 @@ class SingleAgent(
 
     override suspend fun processUserRequest(request: String): Result<String> {
         addMessage(Role.USER, request)
-        return AiApi.processUserRequest(messages.value.asApiMessages(), temperature.value)
+        return AiApiHolder.processUserRequest(messages.value.asApiMessages(), temperature.value)
             .onSuccess { content ->
                 val title = if (type is Type.Custom) type.name else null
                 addMessage(Role.ASSISTANT, content, type.responseFormat, title)

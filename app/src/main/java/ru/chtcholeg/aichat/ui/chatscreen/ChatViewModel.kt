@@ -14,10 +14,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.chtcholeg.aichat.core.AgentHolder
-import ru.chtcholeg.aichat.core.AiApi
 import ru.chtcholeg.aichat.core.CompositeAgent
 import ru.chtcholeg.aichat.core.ResponseFormat
 import ru.chtcholeg.aichat.core.SingleAgent
+import ru.chtcholeg.aichat.core.api.AiApiHolder
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
@@ -148,7 +148,7 @@ class ChatViewModel : ViewModel() {
         inputText,
         shouldSetFocusOnInput,
         dialog,
-        AiApi.currentState,
+        AiApiHolder.currentState,
         messages,
     ) { inputText, shouldSetFocusOnInput, dialog, coreState, messages ->
         ChatState(
@@ -159,7 +159,7 @@ class ChatViewModel : ViewModel() {
             shouldSetFocusOnInput = shouldSetFocusOnInput,
             dialog = dialog,
         )
-    }.stateIn(logicScope, SharingStarted.Companion.WhileSubscribed(5000), ChatState())
+    }.stateIn(logicScope, SharingStarted.WhileSubscribed(5000), ChatState())
 
     fun onAction(action: ChatAction) {
         when (action) {
@@ -201,7 +201,7 @@ class ChatViewModel : ViewModel() {
     }
 
     private fun refreshToken() {
-        AiApi.refreshToken()
+        AiApiHolder.refreshToken()
     }
 
     private fun setTemperature(temperature: Float?) {
