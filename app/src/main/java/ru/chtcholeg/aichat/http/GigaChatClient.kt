@@ -31,14 +31,14 @@ import java.security.cert.X509Certificate
 import java.util.UUID
 import javax.net.ssl.X509TrustManager
 
-object GigachatKtorClient {
+object GigaChatClient {
     private const val TOKEN_RECEIVING_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     private const val API_BASE_URL = "https://gigachat.devices.sberbank.ru/api/v1"
 
     private const val SEND_DELAY_MS = 1000L
     private var lastSendTimeMs = 0L
 
-    val instance = HttpClient(CIO) {
+    private val client = HttpClient(CIO) {
         // JSON serialization
         install(ContentNegotiation) {
             json(Json {
@@ -83,7 +83,7 @@ object GigachatKtorClient {
     suspend fun getToken(clientId: String, clientSecret: String): Result<OAuthResponse> {
         return try {
             // https://developers.sber.ru/docs/ru/gigachat/api/reference/rest/post-token
-            instance.post(TOKEN_RECEIVING_URL) {
+            client.post(TOKEN_RECEIVING_URL) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.Application.Json)
                 basicAuth(clientId, clientSecret)
@@ -98,8 +98,8 @@ object GigachatKtorClient {
     suspend fun send(
         token: String,
         model: String,
-        apiMessages: List<ApiMessage>,
         temperature: Float,
+        apiMessages: List<ApiMessage>,
     ): Result<AiResponse> = withContext(Dispatchers.IO) {
         val nowMs = System.currentTimeMillis()
         val durationMs = nowMs - lastSendTimeMs
@@ -114,7 +114,7 @@ object GigachatKtorClient {
                 messages = apiMessages,
                 temperature = temperature,
             )
-            instance.post("$API_BASE_URL/chat/completions") {
+            client.post("$API_BASE_URL/chat/completions") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
                 bearerAuth(token)

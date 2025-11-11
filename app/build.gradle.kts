@@ -20,6 +20,7 @@ android {
 
         buildConfigField("String", "GIGACHAT_CLIENT_ID", "\"${System.getenv("GIGACHAT_CLIENT_ID") ?: ""}\"")
         buildConfigField("String", "GIGACHAT_CLIENT_SECRET", "\"${System.getenv("GIGACHAT_CLIENT_SECRET") ?: ""}\"")
+        buildConfigField("String", "HUGGINGFACE_API_TOKEN", "\"${System.getenv("HUGGINGFACE_API_TOKEN") ?: ""}\"")
     }
 
     buildTypes {

@@ -92,6 +92,33 @@ private fun SimpleText(chatMessage: ChatMessage.RegularMessage) {
             color = chatMessage.textColor,
             modifier = Modifier.padding(all = 16.dp)
         )
+        chatMessage.originalMessage.requestCompletionTimeMs?.let { requestCompletionTimeMs ->
+            Text(
+                text = "Request completion time (ms) = $requestCompletionTimeMs",
+                color = chatMessage.textColor,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.W200,
+                modifier = Modifier.padding(start = 16.dp, bottom = 2.dp)
+            )
+        }
+        chatMessage.originalMessage.promptTokens?.let { promptTokens ->
+            Text(
+                text = "Prompt token count = $promptTokens",
+                color = chatMessage.textColor,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.W200,
+                modifier = Modifier.padding(start = 16.dp, bottom = 2.dp)
+            )
+        }
+        chatMessage.originalMessage.completionTokens?.let { completionTokens ->
+            Text(
+                text = "Completion token count = $completionTokens",
+                color = chatMessage.textColor,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.W200,
+                modifier = Modifier.padding(start = 16.dp, bottom = 2.dp)
+            )
+        }
     }
 }
 

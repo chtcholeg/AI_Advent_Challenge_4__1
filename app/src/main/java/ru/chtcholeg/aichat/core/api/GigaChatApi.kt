@@ -5,10 +5,10 @@ import ru.chtcholeg.aichat.http.AiResponse
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.OAuthResponse
 
-class GigaChatApi : AiApiBase() {
+class GigaChatApi(private val modelId: String) : AiApiBase() {
 
     override suspend fun getToken(): Result<OAuthResponse> {
-        return GigachatKtorClient.getToken(CLIENT_ID, CLIENT_SECRET)
+        return GigaChatClient.getToken(CLIENT_ID, CLIENT_SECRET)
     }
 
     override suspend fun send(
@@ -16,12 +16,11 @@ class GigaChatApi : AiApiBase() {
         apiMessages: List<ApiMessage>,
         temperature: Float,
     ): Result<AiResponse> {
-        return GigachatKtorClient.send(token, AI_MODEL, apiMessages, temperature)
+        return GigaChatClient.send(token, modelId, temperature, apiMessages)
     }
 
     companion object {
         private const val CLIENT_ID = BuildConfig.GIGACHAT_CLIENT_ID
         private const val CLIENT_SECRET = BuildConfig.GIGACHAT_CLIENT_SECRET
-        private const val AI_MODEL = "GigaChat"
     }
 }

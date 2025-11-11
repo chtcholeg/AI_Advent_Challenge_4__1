@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import ru.chtcholeg.aichat.core.Agent.Companion.DEFAULT_TEMPERATURE
 import ru.chtcholeg.aichat.core.api.AiApiHolder
+import ru.chtcholeg.aichat.core.api.Response
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.ApiMessage.Role
 
@@ -40,10 +41,8 @@ class SingleAgent(
     override suspend fun processUserRequest(request: String): Result<String> {
         addMessage(Role.USER, request)
         return AiApiHolder.processUserRequest(messages.value.asApiMessages(), temperature.value)
-            .onSuccess { content ->
-                val title = if (type is Type.Custom) type.name else null
-                addMessage(Role.ASSISTANT, content, type.responseFormat, title)
-            }
+            .onSuccess { response -> addAssistantMessage(response) }
+            .map { it.content }
     }
 
     private fun addMessage(
@@ -51,10 +50,34 @@ class SingleAgent(
         content: String,
         expectedFormat: ResponseFormat = ResponseFormat.PLAIN_TEXT,
         title: String? = null,
+        requestCompletionTimeMs: Long? = null,
+        promptTokens: Long? = null,
+        completionTokens: Long? = null,
     ) {
         _messages.update { messages ->
-            messages + Message(role, content, expectedFormat, title)
+            messages + Message(
+                role = role,
+                content = content,
+                expectedFormat = expectedFormat,
+                displayableTitle = title,
+                requestCompletionTimeMs = requestCompletionTimeMs,
+                promptTokens = promptTokens,
+                completionTokens = completionTokens,
+            )
         }
+    }
+
+    private fun addAssistantMessage(response: Response) {
+        val title = if (type is Type.Custom) type.name else null
+        addMessage(
+            role = Role.ASSISTANT,
+            content = response.content,
+            expectedFormat = type.responseFormat,
+            title = title,
+            requestCompletionTimeMs = response.requestCompletionTimeMs,
+            promptTokens = response.promptTokens,
+            completionTokens = response.completionTokens,
+        )
     }
 
     private fun List<Message>.asApiMessages(): List<ApiMessage> = mapNotNull { it.originalApiMessage }

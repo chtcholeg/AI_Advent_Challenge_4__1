@@ -56,7 +56,7 @@ open class AiApiBase {
         receiveToken()
     }
 
-    suspend fun processUserRequest(apiMessages: List<ApiMessage>, temperature: Float): Result<String> {
+    suspend fun processUserRequest(apiMessages: List<ApiMessage>, temperature: Float): Result<Response> {
         val newState = _currentState.updateAndGet { state ->
             if (state is AiApiState.Live.Idle) AiApiState.Live.Requesting else state
         }
@@ -68,10 +68,29 @@ open class AiApiBase {
             return Result.failure(AiApiHolder.TokenIsNullException())
         }
 
+        val start = System.currentTimeMillis()
         val result = send(token, apiMessages, temperature)
-        val errorMessage = result.exceptionOrNull()?.message
-        _currentState.compareAndSet(AiApiState.Live.Requesting, AiApiState.Live.Idle(errorMessage))
-        return result.extractContent()
+        val requestCompletionTimeMs = System.currentTimeMillis() - start
+
+        val error = result.exceptionOrNull()
+        _currentState.compareAndSet(AiApiState.Live.Requesting, AiApiState.Live.Idle(error?.message))
+        if (error != null) return Result.failure(error)
+        val content = result.extractContent()
+        val contentError = content.exceptionOrNull()
+        if (contentError != null) return Result.failure(contentError)
+        return Result.success(
+            Response(
+                content = content.getOrNull().orEmpty(),
+                originalAiResponse = result.getOrNull()!!,
+                requestCompletionTimeMs = requestCompletionTimeMs,
+            )
+        )
+    }
+
+    private fun Result<AiResponse>.extractContent() = if (isFailure) {
+        Result.failure(exceptionOrNull()!!)
+    } else {
+        Result.success(getOrNull()?.choices?.firstOrNull()?.message?.content.orEmpty())
     }
 
     open suspend fun getToken(): Result<OAuthResponse> = Result.failure(NotImplementedError())
@@ -80,10 +99,4 @@ open class AiApiBase {
         apiMessages: List<ApiMessage>,
         temperature: Float,
     ): Result<AiResponse> = Result.failure(NotImplementedError())
-
-    private fun Result<AiResponse>.extractContent() = if (isFailure) {
-        Result.failure(exceptionOrNull()!!)
-    } else {
-        Result.success(getOrNull()?.choices?.firstOrNull()?.message?.content.orEmpty())
-    }
 }
