@@ -14,10 +14,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.chtcholeg.aichat.core.AgentHolder
-import ru.chtcholeg.aichat.core.AiApi
 import ru.chtcholeg.aichat.core.CompositeAgent
 import ru.chtcholeg.aichat.core.ResponseFormat
 import ru.chtcholeg.aichat.core.SingleAgent
+import ru.chtcholeg.aichat.core.api.AiApiHolder
+import ru.chtcholeg.aichat.core.api.Model
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
@@ -34,6 +35,7 @@ data class ChatState(
 ) {
     sealed interface Dialog {
         data class Settings(
+            val model: Model = Model.GigaChat,
             val temperature: Float = 1f,
             val selectedTab: Tab = Tab.SingleAgents,
             val selectedAgent: Agent = Agent.Single(),
@@ -61,6 +63,11 @@ data class ChatState(
                 data class Single(val type: SingleAgent.Type = SingleAgent.Type.Regular) : Agent
                 data class Composite(val type: CompositeAgent.Type = CompositeAgent.Type.SeveralTaskSolvers) : Agent
             }
+
+            companion object {
+                val MODELS =
+                    listOf(Model.GigaChat, Model.Llama323BInstruct, Model.MetaLlama370BInstruct, Model.DeepSeekV3)
+            }
         }
     }
 }
@@ -73,6 +80,7 @@ sealed interface ChatAction {
     data object HideDialog : ChatAction
     data object ShowSettings : ChatAction
     data object RefreshToken : ChatAction
+    data class SetModel(val model: Model) : ChatAction
     data class SetTemperature(val temperature: Float?) : ChatAction
     data class SelectTab(val tab: ChatState.Dialog.Settings.Tab) : ChatAction
     data class SetSingleAgent(val type: SingleAgent.Type) : ChatAction
@@ -148,7 +156,7 @@ class ChatViewModel : ViewModel() {
         inputText,
         shouldSetFocusOnInput,
         dialog,
-        AiApi.currentState,
+        AiApiHolder.currentState,
         messages,
     ) { inputText, shouldSetFocusOnInput, dialog, coreState, messages ->
         ChatState(
@@ -159,7 +167,7 @@ class ChatViewModel : ViewModel() {
             shouldSetFocusOnInput = shouldSetFocusOnInput,
             dialog = dialog,
         )
-    }.stateIn(logicScope, SharingStarted.Companion.WhileSubscribed(5000), ChatState())
+    }.stateIn(logicScope, SharingStarted.WhileSubscribed(5000), ChatState())
 
     fun onAction(action: ChatAction) {
         when (action) {
@@ -170,6 +178,7 @@ class ChatViewModel : ViewModel() {
             ChatAction.ShowSettings -> dialogType.value = DialogType.SETTINGS
             ChatAction.ResetChat -> resetChat()
             ChatAction.RefreshToken -> refreshToken()
+            is ChatAction.SetModel -> setModel(action.model)
             is ChatAction.SetTemperature -> setTemperature(action.temperature)
             is ChatAction.SelectTab -> selectSettingsAgentsTab(action.tab)
             is ChatAction.SetSingleAgent -> setSingleAgent(action.type)
@@ -201,7 +210,13 @@ class ChatViewModel : ViewModel() {
     }
 
     private fun refreshToken() {
-        AiApi.refreshToken()
+        AiApiHolder.refreshToken()
+    }
+
+    private fun setModel(model: Model) {
+        if (AiApiHolder.setModel(model)) {
+            resetChat()
+        }
     }
 
     private fun setTemperature(temperature: Float?) {
@@ -246,11 +261,12 @@ class ChatViewModel : ViewModel() {
     }
 
     private fun createSettingsDialogFlow() = combine(
+        AiApiHolder.model,
         AgentHolder.temperature,
         selectedSettingsAgentsTab,
         selectedAgentItem,
-    ) { temperature, selectedTab, selectedAgent ->
-        ChatState.Dialog.Settings(temperature, selectedTab, selectedAgent)
+    ) { model, temperature, selectedTab, selectedAgent ->
+        ChatState.Dialog.Settings(model, temperature, selectedTab, selectedAgent)
     }
 
     private enum class DialogType { NO, SETTINGS }

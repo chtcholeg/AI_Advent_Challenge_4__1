@@ -10,6 +10,9 @@ data class Message(
     val originalApiMessage: ApiMessage? = null,
     val id: Long = currentId.andIncrement,
     val overriddenContent: String? = null,
+    val requestCompletionTimeMs: Long? = null,
+    val promptTokens: Long? = null,
+    val completionTokens: Long? = null,
 ) {
 
     val isSystemPrompt: Boolean get() = originalApiMessage?.isSystemPrompt ?: false
@@ -25,11 +28,17 @@ data class Message(
             content: String,
             expectedFormat: ResponseFormat = ResponseFormat.PLAIN_TEXT,
             displayableTitle: String? = null,
+            requestCompletionTimeMs: Long? = null,
+            promptTokens: Long? = null,
+            completionTokens: Long? = null,
         ) =
             Message(
                 displayableTitle = displayableTitle,
                 expectedFormat = expectedFormat,
                 originalApiMessage = ApiMessage(role, content),
+                requestCompletionTimeMs = requestCompletionTimeMs,
+                promptTokens = promptTokens,
+                completionTokens = completionTokens,
             )
     }
 }

@@ -7,13 +7,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -23,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.chtcholeg.aichat.core.CompositeAgent
 import ru.chtcholeg.aichat.core.SingleAgent
+import ru.chtcholeg.aichat.core.api.Model
 import ru.chtcholeg.aichat.ui.chatscreen.ChatState.Dialog.Settings.Agent
 import ru.chtcholeg.aichat.ui.theme.AIChatTheme
 import ru.chtcholeg.aichat.ui.views.BottomSheet
@@ -50,6 +59,11 @@ fun SettingsDialog(
                 .align(Alignment.CenterHorizontally)
                 .padding(bottom = 8.dp),
         )
+
+        Models(settings.model) { onAction(ChatAction.SetModel(it)) }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
         Temperature(settings.temperature) { onAction(ChatAction.SetTemperature(it)) }
 
         Agents(settings, onAction)
@@ -153,6 +167,45 @@ private val ChatState.Dialog.Settings.Tab.title: String
         ChatState.Dialog.Settings.Tab.SingleAgents -> "Single agent"
         ChatState.Dialog.Settings.Tab.CompositeAgents -> "Composite agent"
     }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Models(model: Model, onValueChange: (Model) -> Unit) {
+    val options = ChatState.Dialog.Settings.MODELS
+    var expanded by remember { mutableStateOf(false) }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Model")
+        Spacer(modifier = Modifier.weight(1f))
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            TextField(
+                value = model.id,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor()
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.id) },
+                        onClick = {
+                            expanded = false
+                            onValueChange(option)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun Temperature(

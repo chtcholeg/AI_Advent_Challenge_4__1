@@ -10,7 +10,16 @@ sealed interface ChatMessage {
     data class RegularMessage(
         val originalMessage: Message,
     ) : ChatMessage {
-        override val stringToCopy: String get() = originalMessage.content ?: "<no content>"
+        override val stringToCopy: String
+            get() = buildString {
+                append(originalMessage.content ?: "<no content>")
+                append("\n")
+                originalMessage.requestCompletionTimeMs?.let { append("\nRequest completion time = ${it.msToSecStr()} sec") }
+                originalMessage.promptTokens?.let { append("\nPrompt token count = $it") }
+                originalMessage.completionTokens?.let { append("\nCompletion token count = $it") }
+            }
+
+        private fun Long.msToSecStr() = "%.3f".format(this / 1000.0)
     }
 
     data class Parsed(
