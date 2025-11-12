@@ -23,9 +23,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import ru.chtcholeg.aichat.http.AIRequest
+import ru.chtcholeg.aichat.http.AiRequest
 import ru.chtcholeg.aichat.http.AiResponse
-import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.OAuthResponse
 import java.security.cert.X509Certificate
 import java.util.UUID
@@ -50,9 +49,9 @@ object GigaChatClient {
 
         // Timeout configuration
         install(HttpTimeout) {
-            requestTimeoutMillis = 30000
-            connectTimeoutMillis = 10000
-            socketTimeoutMillis = 30000
+            requestTimeoutMillis = 120_000
+            connectTimeoutMillis = 5_000
+            socketTimeoutMillis = 30_000
         }
 
         // Logging
@@ -97,9 +96,7 @@ object GigaChatClient {
 
     suspend fun send(
         token: String,
-        model: String,
-        temperature: Float,
-        apiMessages: List<ApiMessage>,
+        aiRequest: AiRequest,
     ): Result<AiResponse> = withContext(Dispatchers.IO) {
         val nowMs = System.currentTimeMillis()
         val durationMs = nowMs - lastSendTimeMs
@@ -109,11 +106,6 @@ object GigaChatClient {
         lastSendTimeMs = nowMs
 
         return@withContext try {
-            val aiRequest = AIRequest(
-                model = model,
-                messages = apiMessages,
-                temperature = temperature,
-            )
             client.post("$API_BASE_URL/chat/completions") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)

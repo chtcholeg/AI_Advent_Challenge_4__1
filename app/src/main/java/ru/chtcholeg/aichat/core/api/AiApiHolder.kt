@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import ru.chtcholeg.aichat.http.ApiMessage
-import kotlin.Exception
 
 object AiApiHolder {
 
@@ -22,6 +21,12 @@ object AiApiHolder {
 
     private val _model = MutableStateFlow<Model>(Model.GigaChat)
     val model = _model.asStateFlow()
+
+    private val _temperature = MutableStateFlow(1f)
+    val temperature = _temperature.asStateFlow()
+
+    private val _maxTokens = MutableStateFlow<Int?>(null)
+    val maxTokens get() = _maxTokens.asStateFlow()
 
     private val aiApi: StateFlow<AiApiBase?> = _model
         .map { model ->
@@ -42,10 +47,19 @@ object AiApiHolder {
         return this._model.getAndUpdate { model } != model
     }
 
+    fun setTemperature(temperature: Float) {
+        _temperature.value = temperature
+    }
+
+    fun setMaxTokens(maxTokens: Int?) {
+        _maxTokens.value = maxTokens
+    }
+
     fun refreshToken() = aiApi.value?.refreshToken()
 
-    suspend fun processUserRequest(apiMessages: List<ApiMessage>, temperature: Float): Result<Response> {
-        return aiApi.value?.processUserRequest(apiMessages, temperature) ?: Result.failure(ApiIsNotSelectedException())
+    suspend fun processUserRequest(apiMessages: List<ApiMessage>): Result<Response> {
+        return aiApi.value?.processUserRequest(apiMessages, temperature.value, maxTokens.value)
+            ?: Result.failure(ApiIsNotSelectedException())
     }
 
     class ApiIsBusyException : Exception("Request can't be completed because of processing of another request")

@@ -3,6 +3,7 @@ package ru.chtcholeg.aichat.ui.chatscreen
 import ru.chtcholeg.aichat.core.Message
 import ru.chtcholeg.aichat.core.ResponseFormat
 import ru.chtcholeg.aichat.http.ApiMessage.Role
+import ru.chtcholeg.aichat.utils.msToSecStr
 
 sealed interface ChatMessage {
     val stringToCopy: String
@@ -18,8 +19,6 @@ sealed interface ChatMessage {
                 originalMessage.promptTokens?.let { append("\nPrompt token count = $it") }
                 originalMessage.completionTokens?.let { append("\nCompletion token count = $it") }
             }
-
-        private fun Long.msToSecStr() = "%.3f".format(this / 1000.0)
     }
 
     data class Parsed(

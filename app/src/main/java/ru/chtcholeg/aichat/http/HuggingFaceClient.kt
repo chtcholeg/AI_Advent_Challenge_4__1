@@ -1,26 +1,32 @@
 package ru.chtcholeg.aichat.http
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpResponseValidator
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ServerResponseException
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.accept
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import ru.chtcholeg.aichat.BuildConfig
 
 object HuggingFaceClient {
     private const val API_BASE_URL = "https://router.huggingface.co/v1"
-
-    private const val API_TOKEN = BuildConfig.HUGGINGFACE_API_TOKEN
 
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -63,22 +69,12 @@ object HuggingFaceClient {
         }
     }
 
-    suspend fun send(
-        model: String,
-        temperature: Float,
-        apiMessages: List<ApiMessage>,
-    ): Result<AiResponse> = withContext(Dispatchers.IO) {
-
+    suspend fun send(token: String, aiRequest: AiRequest): Result<AiResponse> = withContext(Dispatchers.IO) {
         val result: Result<AiResponse> = try {
-            val aiRequest = AIRequest(
-                model = model,
-                messages = apiMessages,
-                temperature = temperature,
-            )
             client.post("${API_BASE_URL}/chat/completions") {
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
-                bearerAuth(API_TOKEN)
+                bearerAuth(token)
                 setBody(
                     Json.encodeToString(aiRequest)
                 )

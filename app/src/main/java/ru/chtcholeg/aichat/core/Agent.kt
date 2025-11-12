@@ -9,9 +9,7 @@ import kotlinx.coroutines.launch
 interface Agent {
     val name: String
     val messages: StateFlow<List<Message>>
-    val temperature: StateFlow<Float>
 
-    fun setTemperature(temperature: Float)
     fun resetMessages()
 
     suspend fun processUserRequest(request: String): Result<String>

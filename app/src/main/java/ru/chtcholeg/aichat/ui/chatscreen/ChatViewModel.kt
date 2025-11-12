@@ -24,6 +24,7 @@ import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTIO
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.utils.ClipboardUtils
 import ru.chtcholeg.aichat.utils.ParserUtils
+import ru.chtcholeg.aichat.utils.msToSecStr
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
@@ -37,18 +38,25 @@ data class ChatState(
         data class Settings(
             val model: Model = Model.GigaChat,
             val temperature: Float = 1f,
-            val selectedTab: Tab = Tab.SingleAgents,
+            val maxTokens: Int? = null,
+            val selectedTab: Tab = Tab.Behaviour,
             val selectedAgent: Agent = Agent.Single(),
         ) : Dialog {
             sealed interface Tab {
-                data object SingleAgents : Tab {
+
+                data object Behaviour : Tab {
                     val items = listOf(
                         SingleAgent.Type.Regular,
                         SingleAgent.Type.StepByStepSolver,
+                        // SingleAgent.Type.FullFledgedAssistant,
+                        SingleAgent.Type.SequentialAssistant,
+                    )
+                }
+
+                data object OutputFormat : Tab {
+                    val items = listOf(
                         SingleAgent.Type.Json(JSON_DESCRIPTION_EXAMPLE),
                         SingleAgent.Type.Xml(XML_DESCRIPTION_EXAMPLE),
-                        SingleAgent.Type.FullFledgedAssistant,
-                        SingleAgent.Type.SequentialAssistant,
                     )
                 }
 
@@ -82,6 +90,7 @@ sealed interface ChatAction {
     data object RefreshToken : ChatAction
     data class SetModel(val model: Model) : ChatAction
     data class SetTemperature(val temperature: Float?) : ChatAction
+    data class SetMaxTokens(val maxTokens: Int?) : ChatAction
     data class SelectTab(val tab: ChatState.Dialog.Settings.Tab) : ChatAction
     data class SetSingleAgent(val type: SingleAgent.Type) : ChatAction
     data class SetCompositeAgent(val type: CompositeAgent.Type) : ChatAction
@@ -98,7 +107,7 @@ class ChatViewModel : ViewModel() {
     private val dialogType = MutableStateFlow<DialogType>(DialogType.NO)
 
     private val selectedSettingsAgentsTab =
-        MutableStateFlow<ChatState.Dialog.Settings.Tab>(ChatState.Dialog.Settings.Tab.SingleAgents)
+        MutableStateFlow<ChatState.Dialog.Settings.Tab>(ChatState.Dialog.Settings.Tab.Behaviour)
 
     private val selectedAgentItem: Flow<ChatState.Dialog.Settings.Agent> = AgentHolder.agent
         .map { aiAgent ->
@@ -180,6 +189,7 @@ class ChatViewModel : ViewModel() {
             ChatAction.RefreshToken -> refreshToken()
             is ChatAction.SetModel -> setModel(action.model)
             is ChatAction.SetTemperature -> setTemperature(action.temperature)
+            is ChatAction.SetMaxTokens -> setMaxTokens(action.maxTokens)
             is ChatAction.SelectTab -> selectSettingsAgentsTab(action.tab)
             is ChatAction.SetSingleAgent -> setSingleAgent(action.type)
             is ChatAction.SetCompositeAgent -> setCompositeAgent(action.type)
@@ -220,7 +230,11 @@ class ChatViewModel : ViewModel() {
     }
 
     private fun setTemperature(temperature: Float?) {
-        AgentHolder.setTemperature(temperature ?: 1.0f)
+        AiApiHolder.setTemperature(temperature ?: 1.0f)
+    }
+
+    private fun setMaxTokens(maxTokens: Int?) {
+        AiApiHolder.setMaxTokens(maxTokens)
     }
 
     private fun selectSettingsAgentsTab(tab: ChatState.Dialog.Settings.Tab) {
@@ -251,7 +265,10 @@ class ChatViewModel : ViewModel() {
                 messages.forEach { message ->
                     val roleStr = message.originalApiMessage?.role?.toString() ?: "<unknown>"
                     val text = message.content ?: "<no content>"
-                    append("$roleStr:\n$text\n\n\n")
+                    val requestCompletionTime = message.requestCompletionTimeMs?.let { "\nRequest completion time = ${it.msToSecStr()} sec" } ?: ""
+                    val promptTokens = message.promptTokens?.let { "\nPrompt token count = $it" } ?: ""
+                    val completionTokens = message.completionTokens?.let { "\nCompletion token count = $it" } ?: ""
+                    append("$roleStr:\n$text\n$requestCompletionTime$promptTokens$completionTokens\n\n\n")
                 }
             }
             ClipboardUtils.copy(context, "all_messages", text)
@@ -262,11 +279,12 @@ class ChatViewModel : ViewModel() {
 
     private fun createSettingsDialogFlow() = combine(
         AiApiHolder.model,
-        AgentHolder.temperature,
+        AiApiHolder.temperature,
+        AiApiHolder.maxTokens,
         selectedSettingsAgentsTab,
         selectedAgentItem,
-    ) { model, temperature, selectedTab, selectedAgent ->
-        ChatState.Dialog.Settings(model, temperature, selectedTab, selectedAgent)
+    ) { model, temperature, maxTokens, selectedTab, selectedAgent ->
+        ChatState.Dialog.Settings(model, temperature, maxTokens, selectedTab, selectedAgent)
     }
 
     private enum class DialogType { NO, SETTINGS }

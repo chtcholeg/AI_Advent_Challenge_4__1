@@ -1,23 +1,19 @@
 package ru.chtcholeg.aichat.core.api
 
+import GigaChatClient
 import ru.chtcholeg.aichat.BuildConfig
+import ru.chtcholeg.aichat.http.AiRequest
 import ru.chtcholeg.aichat.http.AiResponse
-import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.OAuthResponse
 
-class GigaChatApi(private val modelId: String) : AiApiBase() {
+class GigaChatApi(model: String) : AiApiBase(model) {
 
     override suspend fun getToken(): Result<OAuthResponse> {
         return GigaChatClient.getToken(CLIENT_ID, CLIENT_SECRET)
     }
 
-    override suspend fun send(
-        token: String,
-        apiMessages: List<ApiMessage>,
-        temperature: Float,
-    ): Result<AiResponse> {
-        return GigaChatClient.send(token, modelId, temperature, apiMessages)
-    }
+    override suspend fun send(token: String, aiRequest: AiRequest): Result<AiResponse> =
+        GigaChatClient.send(token, aiRequest)
 
     companion object {
         private const val CLIENT_ID = BuildConfig.GIGACHAT_CLIENT_ID

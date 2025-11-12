@@ -11,11 +11,14 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import ru.chtcholeg.aichat.http.AiRequest
 import ru.chtcholeg.aichat.http.AiResponse
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.OAuthResponse
 
-open class AiApiBase {
+open class AiApiBase(
+    private val model: String,
+) {
 
     protected val logicScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -56,7 +59,11 @@ open class AiApiBase {
         receiveToken()
     }
 
-    suspend fun processUserRequest(apiMessages: List<ApiMessage>, temperature: Float): Result<Response> {
+    suspend fun processUserRequest(
+        apiMessages: List<ApiMessage>,
+        temperature: Float,
+        maxTokens: Int?
+    ): Result<Response> {
         val newState = _currentState.updateAndGet { state ->
             if (state is AiApiState.Live.Idle) AiApiState.Live.Requesting else state
         }
@@ -68,10 +75,21 @@ open class AiApiBase {
             return Result.failure(AiApiHolder.TokenIsNullException())
         }
 
-        val start = System.currentTimeMillis()
-        val result = send(token, apiMessages, temperature)
-        val requestCompletionTimeMs = System.currentTimeMillis() - start
+        val aiRequest = AiRequest(
+            model = model, messages = apiMessages, temperature = temperature, maxTokens = maxTokens
+        )
+        val (aiResponse, requestCompletionTimeMs) = measuredSend(token, aiRequest)
 
+        return processAiResponse(aiResponse, requestCompletionTimeMs)
+    }
+
+    private suspend inline fun measuredSend(token: String, aiRequest: AiRequest): Pair<Result<AiResponse>, Long> {
+        val start = System.currentTimeMillis()
+        val response = send(token, aiRequest)
+        return response to (System.currentTimeMillis() - start)
+    }
+
+    private fun processAiResponse(result: Result<AiResponse>, requestCompletionTimeMs: Long): Result<Response> {
         val error = result.exceptionOrNull()
         _currentState.compareAndSet(AiApiState.Live.Requesting, AiApiState.Live.Idle(error?.message))
         if (error != null) return Result.failure(error)
@@ -93,10 +111,9 @@ open class AiApiBase {
         Result.success(getOrNull()?.choices?.firstOrNull()?.message?.content.orEmpty())
     }
 
-    open suspend fun getToken(): Result<OAuthResponse> = Result.failure(NotImplementedError())
-    open suspend fun send(
-        token: String,
-        apiMessages: List<ApiMessage>,
-        temperature: Float,
-    ): Result<AiResponse> = Result.failure(NotImplementedError())
+    open suspend fun getToken(): Result<OAuthResponse> =
+        Result.failure(exception = NotImplementedError())
+
+    open suspend fun send(token: String, aiRequest: AiRequest): Result<AiResponse> =
+        Result.failure(exception = NotImplementedError())
 }

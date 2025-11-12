@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class AIRequest(
+data class AiRequest(
     val model: String,
     val messages: List<ApiMessage>,
     val temperature: Float? = null,
