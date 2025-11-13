@@ -1,6 +1,7 @@
 package ru.chtcholeg.aichat.core
 
 import ru.chtcholeg.aichat.http.ApiMessage
+import ru.chtcholeg.aichat.utils.msToSecStr
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.String
 
@@ -40,5 +41,23 @@ data class Message(
                 promptTokens = promptTokens,
                 completionTokens = completionTokens,
             )
+    }
+}
+
+fun List<Message>.asText(shouldAddSystemInfo: Boolean): String = buildString {
+    this@asText.forEach { message ->
+        val roleStr = message.originalApiMessage?.role?.toString() ?: "<unknown>"
+        val text = message.content ?: "<no content>"
+
+        if (shouldAddSystemInfo) {
+            val requestCompletionTime =
+                message.requestCompletionTimeMs?.let { "\nRequest completion time = ${it.msToSecStr()} sec" }
+                    ?: ""
+            val promptTokens = message.promptTokens?.let { "\nPrompt token count = $it" } ?: ""
+            val completionTokens = message.completionTokens?.let { "\nCompletion token count = $it" } ?: ""
+            append("$roleStr:\n$text\n$requestCompletionTime$promptTokens$completionTokens\n\n\n")
+        } else {
+            append("$roleStr:\n$text\n\n\n")
+        }
     }
 }

@@ -41,6 +41,10 @@ class CompositeAgent(
         aggregatedMessages.value = emptyList()
     }
 
+    override fun addMessage(message: Message) {
+        aggregatedMessages.update { it + message }
+    }
+
     override suspend fun processUserRequest(request: String): Result<String> {
         val masterAgentResult = masterAgent.processUserRequest(request)
         val masterAgentContent = masterAgentResult.getOrNull()

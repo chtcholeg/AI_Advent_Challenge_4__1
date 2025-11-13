@@ -9,6 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -17,14 +18,15 @@ import ru.chtcholeg.aichat.core.AgentHolder
 import ru.chtcholeg.aichat.core.CompositeAgent
 import ru.chtcholeg.aichat.core.ResponseFormat
 import ru.chtcholeg.aichat.core.SingleAgent
+import ru.chtcholeg.aichat.core.Summarizator
 import ru.chtcholeg.aichat.core.api.AiApiHolder
 import ru.chtcholeg.aichat.core.api.Model
+import ru.chtcholeg.aichat.core.asText
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.utils.ClipboardUtils
 import ru.chtcholeg.aichat.utils.ParserUtils
-import ru.chtcholeg.aichat.utils.msToSecStr
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
@@ -77,6 +79,8 @@ data class ChatState(
                     listOf(Model.GigaChat, Model.Llama323BInstruct, Model.MetaLlama370BInstruct, Model.DeepSeekV3)
             }
         }
+
+        data object SummarizationConfirmation : Dialog
     }
 }
 
@@ -85,6 +89,8 @@ sealed interface ChatAction {
     data class Input(val text: String) : ChatAction
     data object ResetNeedForInputFocus : ChatAction
     data object ResetChat : ChatAction
+    data object AskToSummarize : ChatAction
+    data class Summarize(val shouldSaveSystemPrompt: Boolean) : ChatAction
     data object HideDialog : ChatAction
     data object ShowSettings : ChatAction
     data object RefreshToken : ChatAction
@@ -121,8 +127,9 @@ class ChatViewModel : ViewModel() {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val dialog = dialogType.flatMapLatest { dialogType ->
         when (dialogType) {
-            DialogType.NO -> MutableStateFlow<ChatState.Dialog?>(null)
+            DialogType.NO -> MutableStateFlow(null)
             DialogType.SETTINGS -> createSettingsDialogFlow()
+            DialogType.SUMMARIZATION_CONFIRMATION -> createSummarizationConfirmationDialogFlow()
         }
     }
 
@@ -186,6 +193,8 @@ class ChatViewModel : ViewModel() {
             ChatAction.HideDialog -> dialogType.value = DialogType.NO
             ChatAction.ShowSettings -> dialogType.value = DialogType.SETTINGS
             ChatAction.ResetChat -> resetChat()
+            ChatAction.AskToSummarize -> askToSummarize()
+            is ChatAction.Summarize -> summarize(action.shouldSaveSystemPrompt)
             ChatAction.RefreshToken -> refreshToken()
             is ChatAction.SetModel -> setModel(action.model)
             is ChatAction.SetTemperature -> setTemperature(action.temperature)
@@ -217,6 +226,15 @@ class ChatViewModel : ViewModel() {
 
     private fun resetChat() {
         AgentHolder.resetCurrentChat()
+    }
+
+    private fun askToSummarize() {
+        dialogType.value = DialogType.SUMMARIZATION_CONFIRMATION
+    }
+
+    private fun summarize(shouldSaveSystemPrompt: Boolean) {
+        dialogType.value = DialogType.NO
+        Summarizator.summarizeCurrentChat(shouldSaveSystemPrompt)
     }
 
     private fun refreshToken() {
@@ -262,14 +280,7 @@ class ChatViewModel : ViewModel() {
             val text = buildString {
                 val aiAgent = AgentHolder.agent.value
                 val messages = aiAgent.messages.value.filter { !it.isSystemPrompt }
-                messages.forEach { message ->
-                    val roleStr = message.originalApiMessage?.role?.toString() ?: "<unknown>"
-                    val text = message.content ?: "<no content>"
-                    val requestCompletionTime = message.requestCompletionTimeMs?.let { "\nRequest completion time = ${it.msToSecStr()} sec" } ?: ""
-                    val promptTokens = message.promptTokens?.let { "\nPrompt token count = $it" } ?: ""
-                    val completionTokens = message.completionTokens?.let { "\nCompletion token count = $it" } ?: ""
-                    append("$roleStr:\n$text\n$requestCompletionTime$promptTokens$completionTokens\n\n\n")
-                }
+                messages.asText(true)
             }
             ClipboardUtils.copy(context, "all_messages", text)
         } catch (e: Exception) {
@@ -287,7 +298,10 @@ class ChatViewModel : ViewModel() {
         ChatState.Dialog.Settings(model, temperature, maxTokens, selectedTab, selectedAgent)
     }
 
-    private enum class DialogType { NO, SETTINGS }
+    private fun createSummarizationConfirmationDialogFlow() =
+        MutableStateFlow(ChatState.Dialog.SummarizationConfirmation).asStateFlow()
+
+    private enum class DialogType { NO, SETTINGS, SUMMARIZATION_CONFIRMATION }
 
     companion object {
         const val JSON_DESCRIPTION_EXAMPLE = "{\n" +

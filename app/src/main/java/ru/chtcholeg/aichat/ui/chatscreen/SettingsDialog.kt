@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -64,19 +63,11 @@ fun SettingsDialog(
         Spacer(modifier = Modifier.height(8.dp))
 
         Row {
-            Button(
-                onClick = { onAction(ChatAction.ResetChat) },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Reset chat")
-            }
-            Spacer(Modifier.width(16.dp))
-            Button(
-                onClick = { onAction(ChatAction.RefreshToken) },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Refresh token")
-            }
+            ActionButton("Reset chat") { onAction(ChatAction.ResetChat) }
+            Spacer(Modifier.width(8.dp))
+            ActionButton("Summarize") { onAction(ChatAction.AskToSummarize) }
+            Spacer(Modifier.width(8.dp))
+            ActionButton("Refresh token") { onAction(ChatAction.RefreshToken) }
         }
         Spacer(modifier = Modifier.height(8.dp))
     }

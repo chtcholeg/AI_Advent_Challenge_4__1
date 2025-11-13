@@ -121,6 +121,8 @@ private fun ChatScreen(
                 onAction,
                 dialog,
             )
+
+            is ChatState.Dialog.SummarizationConfirmation -> SummarizationConfirmation(onAction)
         }
     }
 }
