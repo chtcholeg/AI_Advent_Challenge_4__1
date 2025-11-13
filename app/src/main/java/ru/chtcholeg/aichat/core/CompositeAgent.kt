@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import ru.chtcholeg.aichat.core.Agent.Companion.DEFAULT_TEMPERATURE
 
 class CompositeAgent(
     val type: Type,
@@ -23,16 +22,11 @@ class CompositeAgent(
 
     override val name = "Composite"
 
-
     private val aggregatedMessages = MutableStateFlow<List<Message>>(emptyList())
     override val messages = aggregatedMessages.asStateFlow()
 
-    private val _temperature = MutableStateFlow(DEFAULT_TEMPERATURE)
-    override val temperature = _temperature.asStateFlow()
-
     private val masterAgent: Agent by lazy {
         type.createMasterAgent().apply {
-            setTemperature(temperature.value)
             messages
                 .map { messages -> messages.filter { it.expectedFormat == ResponseFormat.PLAIN_TEXT } }
                 .distinctUntilChanged()
@@ -40,10 +34,6 @@ class CompositeAgent(
                     addNewMessages(messages)
                 }.launchIn(logicScope)
         }
-    }
-
-    override fun setTemperature(temperature: Float) {
-        _temperature.value = temperature
     }
 
     override fun resetMessages() {

@@ -3,7 +3,6 @@ package ru.chtcholeg.aichat.core
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import ru.chtcholeg.aichat.core.Agent.Companion.DEFAULT_TEMPERATURE
 import ru.chtcholeg.aichat.core.api.AiApiHolder
 import ru.chtcholeg.aichat.core.api.Response
 import ru.chtcholeg.aichat.http.ApiMessage
@@ -27,20 +26,13 @@ class SingleAgent(
     private val _messages = MutableStateFlow(initMessageList)
     override val messages = _messages.asStateFlow()
 
-    private val _temperature = MutableStateFlow(DEFAULT_TEMPERATURE)
-    override val temperature = _temperature.asStateFlow()
-
-    override fun setTemperature(temperature: Float) {
-        _temperature.value = temperature
-    }
-
     override fun resetMessages() {
         _messages.value = initMessageList
     }
 
     override suspend fun processUserRequest(request: String): Result<String> {
         addMessage(Role.USER, request)
-        return AiApiHolder.processUserRequest(messages.value.asApiMessages(), temperature.value)
+        return AiApiHolder.processUserRequest(messages.value.asApiMessages())
             .onSuccess { response -> addAssistantMessage(response) }
             .map { it.content }
     }

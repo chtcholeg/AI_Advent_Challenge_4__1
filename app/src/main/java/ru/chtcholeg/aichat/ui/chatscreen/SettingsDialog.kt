@@ -7,21 +7,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -31,14 +23,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import ru.chtcholeg.aichat.core.CompositeAgent
 import ru.chtcholeg.aichat.core.SingleAgent
-import ru.chtcholeg.aichat.core.api.Model
 import ru.chtcholeg.aichat.ui.chatscreen.ChatState.Dialog.Settings.Agent
 import ru.chtcholeg.aichat.ui.theme.AIChatTheme
 import ru.chtcholeg.aichat.ui.views.BottomSheet
-import ru.chtcholeg.aichat.ui.views.FloatTextField
 
 private val MAX_TAB_AGENT_COUNT = maxOf(
-    ChatState.Dialog.Settings.Tab.SingleAgents.items.size,
+    ChatState.Dialog.Settings.Tab.Behaviour.items.size,
+    ChatState.Dialog.Settings.Tab.OutputFormat.items.size,
     ChatState.Dialog.Settings.Tab.CompositeAgents.items.size
 )
 
@@ -61,10 +52,13 @@ fun SettingsDialog(
         )
 
         Models(settings.model) { onAction(ChatAction.SetModel(it)) }
-
         Spacer(modifier = Modifier.height(8.dp))
 
         Temperature(settings.temperature) { onAction(ChatAction.SetTemperature(it)) }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        MaxTokens(settings.maxTokens) { onAction(ChatAction.SetMaxTokens(it)) }
+        Spacer(modifier = Modifier.height(8.dp))
 
         Agents(settings, onAction)
         Spacer(modifier = Modifier.height(8.dp))
@@ -97,15 +91,16 @@ private fun Agents(
     val selectedTab = settings.selectedTab
     val selectedTabIndex = selectedTab.index
     SecondaryTabRow(selectedTabIndex = selectedTabIndex) {
-        AgentsTab(ChatState.Dialog.Settings.Tab.SingleAgents, selectedTabIndex, onAction)
+        AgentsTab(ChatState.Dialog.Settings.Tab.Behaviour, selectedTabIndex, onAction)
+        AgentsTab(ChatState.Dialog.Settings.Tab.OutputFormat, selectedTabIndex, onAction)
         AgentsTab(ChatState.Dialog.Settings.Tab.CompositeAgents, selectedTabIndex, onAction)
     }
 
     val selectedAgent = settings.selectedAgent
-    if (selectedTab == ChatState.Dialog.Settings.Tab.SingleAgents) {
-        SingleAgentItems(selectedAgent, onAction)
-    } else {
-        CompositeAgentsItems(selectedAgent, onAction)
+    when (selectedTab) {
+        ChatState.Dialog.Settings.Tab.Behaviour -> BehaviourItems(selectedAgent, onAction)
+        ChatState.Dialog.Settings.Tab.OutputFormat -> OutputFormatItems(selectedAgent, onAction)
+        ChatState.Dialog.Settings.Tab.CompositeAgents -> CompositeAgentsItems(selectedAgent, onAction)
     }
 }
 
@@ -123,8 +118,25 @@ private fun AgentsTab(
 }
 
 @Composable
-private fun SingleAgentItems(selectedAgent: Agent, onAction: (ChatAction) -> Unit) {
-    val types = ChatState.Dialog.Settings.Tab.SingleAgents.items
+private fun BehaviourItems(selectedAgent: Agent, onAction: (ChatAction) -> Unit) {
+    val types = ChatState.Dialog.Settings.Tab.Behaviour.items
+    for (i in 0..<MAX_TAB_AGENT_COUNT) {
+        val type = if (i < types.size) types[i] else types.last()
+        val isFake = i >= types.size
+        SingleAgentItem(
+            type = type,
+            selectedAgent = selectedAgent,
+            onSelected = { if (!isFake) onAction(ChatAction.SetSingleAgent(type)) },
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .alpha(if (isFake) 0f else 1f)
+        )
+    }
+}
+
+@Composable
+private fun OutputFormatItems(selectedAgent: Agent, onAction: (ChatAction) -> Unit) {
+    val types = ChatState.Dialog.Settings.Tab.OutputFormat.items
     for (i in 0..<MAX_TAB_AGENT_COUNT) {
         val type = if (i < types.size) types[i] else types.last()
         val isFake = i >= types.size
@@ -158,76 +170,17 @@ private fun CompositeAgentsItems(selectedAgent: Agent, onAction: (ChatAction) ->
 
 private val ChatState.Dialog.Settings.Tab.index: Int
     get() = when (this) {
-        ChatState.Dialog.Settings.Tab.SingleAgents -> 0
-        ChatState.Dialog.Settings.Tab.CompositeAgents -> 1
+        ChatState.Dialog.Settings.Tab.Behaviour -> 0
+        ChatState.Dialog.Settings.Tab.OutputFormat -> 1
+        ChatState.Dialog.Settings.Tab.CompositeAgents -> 2
     }
 
 private val ChatState.Dialog.Settings.Tab.title: String
     get() = when (this) {
-        ChatState.Dialog.Settings.Tab.SingleAgents -> "Single agent"
-        ChatState.Dialog.Settings.Tab.CompositeAgents -> "Composite agent"
+        ChatState.Dialog.Settings.Tab.Behaviour -> "Behaviour"
+        ChatState.Dialog.Settings.Tab.OutputFormat -> "Output format"
+        ChatState.Dialog.Settings.Tab.CompositeAgents -> "Composite"
     }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun Models(model: Model, onValueChange: (Model) -> Unit) {
-    val options = ChatState.Dialog.Settings.MODELS
-    var expanded by remember { mutableStateOf(false) }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("Model")
-        Spacer(modifier = Modifier.weight(1f))
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
-        ) {
-            TextField(
-                value = model.id,
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor()
-            )
-
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option.id) },
-                        onClick = {
-                            expanded = false
-                            onValueChange(option)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Temperature(
-    temperature: Float,
-    onValueChange: (Float) -> Unit,
-) {
-    Row(
-        modifier = Modifier.padding(vertical = 4.dp),
-    ) {
-        Text(
-            text = "Temperature\n(≈0 - deterministic answer)",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(2f),
-        )
-        Spacer(Modifier.width(8.dp))
-        FloatTextField(
-            value = temperature,
-            onValueChange = { onValueChange(it ?: 1f) },
-            modifier = Modifier.weight(1.2f),
-        )
-    }
-}
 
 @Composable
 private fun SingleAgentItem(

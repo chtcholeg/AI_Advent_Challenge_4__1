@@ -15,28 +15,17 @@ object AgentHolder {
     @OptIn(ExperimentalCoroutinesApi::class)
     val messages get() = agent.flatMapLatest { it.messages }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val temperature get() = agent.flatMapLatest { it.temperature }
-
     fun resetCurrentChat() = agent.value.resetMessages()
-
-    fun setTemperature(temperature: Float) = agent.value.setTemperature(temperature)
 
     fun setSingleAgent(type: SingleAgent.Type) {
         _agent.update { currentAgent ->
-            if (currentAgent.isSame(type)) return@update currentAgent
-            SingleAgent(type).apply {
-                setTemperature(currentAgent.temperature.value)
-            }
+            if (currentAgent.isSame(type)) currentAgent else SingleAgent(type)
         }
     }
 
     fun setCompositeAgent(type: CompositeAgent.Type) {
         _agent.update { currentAgent ->
-            if (currentAgent.isSame(type)) return@update currentAgent
-            CompositeAgent(type).apply {
-                setTemperature(currentAgent.temperature.value)
-            }
+            if (currentAgent.isSame(type)) currentAgent else CompositeAgent(type)
         }
     }
 
