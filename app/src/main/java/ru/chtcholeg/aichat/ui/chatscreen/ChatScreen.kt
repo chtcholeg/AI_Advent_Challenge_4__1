@@ -1,12 +1,14 @@
 package ru.chtcholeg.aichat.ui.chatscreen
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CopyAll
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,7 +50,7 @@ private fun ChatScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("AI Chat") },
-                navigationIcon = { NavigationIcon(onAction) },
+                navigationIcon = { NavigationIcons(onAction) },
                 actions = { Actions(onAction) },
             )
         },
@@ -117,37 +119,44 @@ private fun ChatScreen(
 
     state.dialog?.let { dialog ->
         when (dialog) {
-            is ChatState.Dialog.Settings -> SettingsDialog(
-                onAction,
-                dialog,
-            )
-
+            is ChatState.Dialog.Settings -> SettingsDialog(onAction, dialog)
             is ChatState.Dialog.SummarizationConfirmation -> SummarizationConfirmation(onAction)
+            is ChatState.Dialog.History -> HistoryDialog(onAction, dialog)
         }
     }
 }
 
 @Composable
 private fun Actions(onAction: (ChatAction) -> Unit) {
-    IconButton(
-        onClick = { onAction(ChatAction.ShowSettings) }
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Settings,
-            contentDescription = "Settings"
-        )
+    Row {
+        val context = LocalContext.current
+        IconButton(
+            onClick = { onAction(ChatAction.CopyAll(context)) }
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CopyAll,
+                contentDescription = "Copy all conversation"
+            )
+        }
+        IconButton(
+            onClick = { onAction(ChatAction.ShowSettings) }
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = "Settings"
+            )
+        }
     }
 }
 
 @Composable
-private fun NavigationIcon(onAction: (ChatAction) -> Unit) {
-    val context = LocalContext.current
+private fun NavigationIcons(onAction: (ChatAction) -> Unit) {
     IconButton(
-        onClick = { onAction(ChatAction.CopyAll(context)) }
+        onClick = { onAction(ChatAction.ShowHistory) }
     ) {
         Icon(
-            imageVector = Icons.Filled.CopyAll,
-            contentDescription = "Copy all conversation"
+            imageVector = Icons.Filled.History,
+            contentDescription = "History"
         )
     }
 }

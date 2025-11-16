@@ -36,11 +36,6 @@ class CompositeAgent(
         }
     }
 
-    override fun resetMessages() {
-        masterAgent.resetMessages()
-        aggregatedMessages.value = emptyList()
-    }
-
     override fun addMessage(message: Message) {
         aggregatedMessages.update { it + message }
     }

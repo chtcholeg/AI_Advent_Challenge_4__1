@@ -10,8 +10,6 @@ interface Agent {
     val name: String
     val messages: StateFlow<List<Message>>
 
-    fun resetMessages()
-
     fun addMessage(message: Message)
 
     suspend fun processUserRequest(request: String): Result<String>

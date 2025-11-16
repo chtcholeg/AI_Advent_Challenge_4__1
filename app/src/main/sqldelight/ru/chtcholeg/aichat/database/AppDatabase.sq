@@ -1,0 +1,66 @@
+CREATE TABLE chat (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE message (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    content_type TEXT NOT NULL,
+    metadata TEXT -- Additional information
+);
+
+-- Chats
+getAllChats:
+SELECT * FROM chat
+ORDER BY updated_at DESC;
+
+getChatById:
+SELECT * FROM chat WHERE id = ?;
+
+insertChat:
+INSERT INTO chat(id, name, type, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?);
+
+updateChatName:
+UPDATE chat
+SET name = ?, updated_at = ?
+WHERE id = ?;
+
+updateChatTimestamp:
+UPDATE chat
+SET updated_at = ?
+WHERE id = ?;
+
+deleteChat:
+DELETE FROM chat WHERE id = ?;
+
+-- Messages
+getMessagesByChatId:
+SELECT * FROM message
+WHERE chat_id = ?
+ORDER BY timestamp ASC;
+
+getMessageById:
+SELECT * FROM message WHERE id = ?;
+
+insertMessage:
+INSERT INTO message(id, chat_id, role, content, timestamp, content_type, metadata)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+updateMessage:
+UPDATE message
+SET content = ?, content_type = ?, metadata = ?
+WHERE id = ?;
+
+deleteMessagesByChatId:
+DELETE FROM message WHERE chat_id = ?;
+
+deleteMessage:
+DELETE FROM message WHERE id = ?;

@@ -22,6 +22,8 @@ import ru.chtcholeg.aichat.core.Summarizator
 import ru.chtcholeg.aichat.core.api.AiApiHolder
 import ru.chtcholeg.aichat.core.api.Model
 import ru.chtcholeg.aichat.core.asText
+import ru.chtcholeg.aichat.database.Chat
+import ru.chtcholeg.aichat.database.ChatRepository
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
@@ -81,6 +83,10 @@ data class ChatState(
         }
 
         data object SummarizationConfirmation : Dialog
+
+        data class History(
+            val chats: List<Chat>,
+        ) : Dialog
     }
 }
 
@@ -102,6 +108,7 @@ sealed interface ChatAction {
     data class SetCompositeAgent(val type: CompositeAgent.Type) : ChatAction
     data class Copy(val context: Context, val chatMessage: ChatMessage) : ChatAction
     data class CopyAll(val context: Context) : ChatAction
+    data object ShowHistory : ChatAction
 }
 
 class ChatViewModel : ViewModel() {
@@ -130,6 +137,7 @@ class ChatViewModel : ViewModel() {
             DialogType.NO -> MutableStateFlow(null)
             DialogType.SETTINGS -> createSettingsDialogFlow()
             DialogType.SUMMARIZATION_CONFIRMATION -> createSummarizationConfirmationDialogFlow()
+            DialogType.HISTORY -> createHistoryDialogFlow()
         }
     }
 
@@ -204,6 +212,7 @@ class ChatViewModel : ViewModel() {
             is ChatAction.SetCompositeAgent -> setCompositeAgent(action.type)
             is ChatAction.Copy -> copy(action.context, action.chatMessage)
             is ChatAction.CopyAll -> copyAll(action.context)
+            is ChatAction.ShowHistory -> dialogType.value = DialogType.HISTORY
         }
     }
 
@@ -301,7 +310,10 @@ class ChatViewModel : ViewModel() {
     private fun createSummarizationConfirmationDialogFlow() =
         MutableStateFlow(ChatState.Dialog.SummarizationConfirmation).asStateFlow()
 
-    private enum class DialogType { NO, SETTINGS, SUMMARIZATION_CONFIRMATION }
+    private fun createHistoryDialogFlow() = ChatRepository.getAllChats()
+        .map { ChatState.Dialog.History(it) }
+
+    private enum class DialogType { NO, SETTINGS, SUMMARIZATION_CONFIRMATION, HISTORY }
 
     companion object {
         const val JSON_DESCRIPTION_EXAMPLE = "{\n" +
