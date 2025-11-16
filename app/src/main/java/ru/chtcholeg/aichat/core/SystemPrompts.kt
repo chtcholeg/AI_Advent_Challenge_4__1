@@ -26,6 +26,22 @@ object SystemPrompts {
                 "Структура ответа ДОЛЖНА быть такой:\n" +
                 "<{xml_description}>"
 
+    private const val SUMMARY_MAKER_TEMPLATE =
+        "Ты — ассистент для создания конспектов. Твоя задача — создать краткую и содержательную summary предыдущего диалога между пользователем и AI-ассистентом. Эта summary будет использоваться для продолжения работы в новом чате.\n" +
+                "\n" +
+                "Структурируй свой ответ по следующим разделам:\n" +
+                "\n" +
+                "1.  **Основная цель:** Главная задача или проблема, которую мы решаем.\n" +
+                "2.  **Ключевые решения:** Важные идеи, согласованные подходы, фрагменты кода или решения, которые мы разработали.\n" +
+                "3.  **Важный контекст:** Существенные ограничения, предпочтения пользователя, тон общения, целевая аудитория или технические детали.\n" +
+                "4.  **Текущий статус:** На каком этапе мы находимся? Что уже сделано и каков следующий Immediate шаг?\n" +
+                "\n" +
+                "**История диалога:**\n" +
+                "<{previous_conversation}>\n" +
+                "\n" +
+                "\n" +
+                "Предоставь summary. Не добавляй новые идеи и не отклоняйся от информации в диалоге."
+
     const val STEP_BY_STEP_SOLVER =
         "Ты должен решать пославленную пользователем проблему ПОШАГОВО (каждый шаг надо расписывать)"
 
@@ -68,5 +84,7 @@ object SystemPrompts {
 
     fun json(jsonDescription: String) = JSON_TEMPLATE.replace("<{json_description}>", jsonDescription)
     fun xml(xmlDescription: String) = XML_TEMPLATE.replace("<{xml_description}>", xmlDescription)
+    fun summarizator(previousConversation: String) =
+        SUMMARY_MAKER_TEMPLATE.replace("<{previous_conversation}>", previousConversation)
 
 }

@@ -50,7 +50,7 @@ object GigaChatClient {
         // Timeout configuration
         install(HttpTimeout) {
             requestTimeoutMillis = 120_000
-            connectTimeoutMillis = 5_000
+            connectTimeoutMillis = 10_000
             socketTimeoutMillis = 30_000
         }
 

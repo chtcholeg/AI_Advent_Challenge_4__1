@@ -12,11 +12,9 @@ interface Agent {
 
     fun resetMessages()
 
-    suspend fun processUserRequest(request: String): Result<String>
+    fun addMessage(message: Message)
 
-    companion object {
-        const val DEFAULT_TEMPERATURE = 1f
-    }
+    suspend fun processUserRequest(request: String): Result<String>
 }
 
 fun Agent.launchProcessingUserRequest(request: String) {

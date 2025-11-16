@@ -30,6 +30,10 @@ class SingleAgent(
         _messages.value = initMessageList
     }
 
+    override fun addMessage(message: Message) {
+        _messages.update { current -> current + message }
+    }
+
     override suspend fun processUserRequest(request: String): Result<String> {
         addMessage(Role.USER, request)
         return AiApiHolder.processUserRequest(messages.value.asApiMessages())

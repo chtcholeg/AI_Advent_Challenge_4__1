@@ -17,6 +17,8 @@ object AgentHolder {
 
     fun resetCurrentChat() = agent.value.resetMessages()
 
+    fun addMessage(message: Message) = agent.value.addMessage(message)
+
     fun setSingleAgent(type: SingleAgent.Type) {
         _agent.update { currentAgent ->
             if (currentAgent.isSame(type)) currentAgent else SingleAgent(type)
