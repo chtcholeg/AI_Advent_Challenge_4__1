@@ -1,3 +1,8 @@
 package ru.chtcholeg.aichat.core
 
-enum class ResponseFormat { PLAIN_TEXT, JSON, XML }
+enum class ResponseFormat(val idInDatabase: String) {
+    PLAIN_TEXT("plain-text"),
+    JSON("json"),
+    XML("xml"),
+    ;
+}
