@@ -13,12 +13,12 @@ class DatabaseManager(context: Context) {
         callback = object : AndroidSqliteDriver.Callback(AppDatabase.Schema) {
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
-                db.execSQL("PRAGMA foreign_keys = ON")
+                //db.execSQL("PRAGMA foreign_keys = ON")
             }
 
             override fun onConfigure(db: SupportSQLiteDatabase) {
                 super.onConfigure(db)
-                db.setForeignKeyConstraintsEnabled(true)
+                //db.setForeignKeyConstraintsEnabled(true)
             }
         }
     )

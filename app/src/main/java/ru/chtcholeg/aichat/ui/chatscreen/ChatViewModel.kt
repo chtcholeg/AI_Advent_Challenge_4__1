@@ -14,8 +14,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import ru.chtcholeg.aichat.core.AgentHolder
 import ru.chtcholeg.aichat.core.CompositeAgent
+import ru.chtcholeg.aichat.core.Message
 import ru.chtcholeg.aichat.core.ResponseFormat
 import ru.chtcholeg.aichat.core.SingleAgent
 import ru.chtcholeg.aichat.core.Summarizator
@@ -29,6 +31,9 @@ import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.JSON_DESCRIPTIO
 import ru.chtcholeg.aichat.ui.chatscreen.ChatViewModel.Companion.XML_DESCRIPTION_EXAMPLE
 import ru.chtcholeg.aichat.utils.ClipboardUtils
 import ru.chtcholeg.aichat.utils.ParserUtils
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
@@ -85,8 +90,14 @@ data class ChatState(
         data object SummarizationConfirmation : Dialog
 
         data class History(
-            val chats: List<Chat>,
-        ) : Dialog
+            val items: List<Item>,
+        ) : Dialog {
+            sealed interface Item {
+                data object Title : Item
+                data class Header(val text: String) : Item
+                data class ChatInfo(val chat: Chat) : Item
+            }
+        }
     }
 }
 
@@ -109,6 +120,8 @@ sealed interface ChatAction {
     data class Copy(val context: Context, val chatMessage: ChatMessage) : ChatAction
     data class CopyAll(val context: Context) : ChatAction
     data object ShowHistory : ChatAction
+    data class LoadChat(val chatId: String) : ChatAction
+    data class DeleteChat(val chatId: String) : ChatAction
 }
 
 class ChatViewModel : ViewModel() {
@@ -213,6 +226,8 @@ class ChatViewModel : ViewModel() {
             is ChatAction.Copy -> copy(action.context, action.chatMessage)
             is ChatAction.CopyAll -> copyAll(action.context)
             is ChatAction.ShowHistory -> dialogType.value = DialogType.HISTORY
+            is ChatAction.LoadChat -> loadChat(action.chatId)
+            is ChatAction.DeleteChat -> deleteChat(action.chatId)
         }
     }
 
@@ -297,6 +312,33 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    private fun loadChat(chatId: String) {
+        logicScope.launch {
+            val chat = ChatRepository.getChatById(chatId) ?: return@launch
+            val messages = ChatRepository.getMessagesByChatId(chatId)
+            AgentHolder.setChat(
+                chat,
+                messages = messages.map { dbMessage -> Message(originalApiMessage = dbMessage.apiMessage()) },
+            )
+        }
+    }
+
+    private fun ru.chtcholeg.aichat.database.Message.apiMessage() = ApiMessage(
+        role = toApiRole(role),
+        content = content,
+    )
+
+    private fun toApiRole(roleStr: String): ApiMessage.Role {
+        ApiMessage.Role.entries.forEach {
+            if (it.name == roleStr) return it
+        }
+        return ApiMessage.Role.ASSISTANT
+    }
+
+    private fun deleteChat(chatId: String) {
+        logicScope.launch { ChatRepository.deleteChat(chatId) }
+    }
+
     private fun createSettingsDialogFlow() = combine(
         AiApiHolder.model,
         AiApiHolder.temperature,
@@ -311,7 +353,30 @@ class ChatViewModel : ViewModel() {
         MutableStateFlow(ChatState.Dialog.SummarizationConfirmation).asStateFlow()
 
     private fun createHistoryDialogFlow() = ChatRepository.getAllChats()
-        .map { ChatState.Dialog.History(it) }
+        .map { chats ->
+            val groups = groupChatsByDay(chats)
+            val items = buildList {
+                add(ChatState.Dialog.History.Item.Title)
+                groups.forEach { group ->
+                    add(ChatState.Dialog.History.Item.Header(group.first))
+                    group.second.forEach { chat ->
+                        add(ChatState.Dialog.History.Item.ChatInfo(chat))
+                    }
+                }
+            }
+            ChatState.Dialog.History(items)
+        }
+
+    private fun groupChatsByDay(chats: List<Chat>): List<Pair<String, List<Chat>>> {
+        return chats
+            .groupBy { chat -> formatDate(chat.updated_at) }
+            .toList()
+            .sortedBy { it.first }
+    }
+
+    private fun formatDate(timestamp: Long): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestamp))
+    }
 
     private enum class DialogType { NO, SETTINGS, SUMMARIZATION_CONFIRMATION, HISTORY }
 

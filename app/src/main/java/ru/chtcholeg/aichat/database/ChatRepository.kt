@@ -2,12 +2,15 @@ package ru.chtcholeg.aichat.database
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.withContext
 import java.util.UUID
 
 object ChatRepository {
+    val scope = CoroutineScope(Dispatchers.IO.limitedParallelism(1) + SupervisorJob())
+
     private val database get() = DatabaseManager.instance.appDatabase
     private val queries get() = database.appDatabaseQueries
 
@@ -17,43 +20,38 @@ object ChatRepository {
             .mapToList(Dispatchers.Default)
 
 
-    suspend fun getChatById(id: String): Chat? = withContext(Dispatchers.IO) {
-        queries.getChatById(id)
-            .executeAsOneOrNull()
+    fun getChatById(id: String): Chat? = database.transactionWithResult {
+        queries.getChatById(id).executeAsOneOrNull()
     }
 
-    suspend fun createChat(
+    fun createChat(
         id: String,
         name: String,
         type: String,
         createdAt: Long,
-    ) = withContext(Dispatchers.IO) {
-        queries.insertChat(id, name, type, createdAt, createdAt)
-    }
+    ) = queries.insertChat(id, name, type, createdAt, createdAt)
 
-    suspend fun updateChatName(chatId: String, newName: String) = withContext(Dispatchers.IO) {
+    fun updateChatName(chatId: String, newName: String) {
         val now = System.currentTimeMillis()
         queries.updateChatName(newName, now, chatId)
     }
 
-    suspend fun deleteChat(chatId: String) = withContext(Dispatchers.IO) {
+    fun deleteChat(chatId: String) {
         database.transaction {
             queries.deleteChat(chatId)
             queries.deleteMessagesByChatId(chatId)
         }
     }
 
-    fun getMessagesByChatId(chatId: String): Flow<List<Message>> =
-        queries.getMessagesByChatId(chatId)
-            .asFlow()
-            .mapToList(Dispatchers.Default)
+    fun getMessagesByChatId(chatId: String): List<Message> =
+        queries.getMessagesByChatId(chatId).executeAsList()
 
-    suspend fun addMessage(
+    fun addMessage(
         chatId: String,
         role: String,
         content: String,
         contentType: String,
-    ) = withContext(Dispatchers.IO) {
+    ) {
         val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
 
@@ -66,7 +64,7 @@ object ChatRepository {
         }
     }
 
-    suspend fun deleteMessage(messageId: String) = withContext(Dispatchers.IO) {
+    fun deleteMessage(messageId: String) = {
         queries.deleteMessage(messageId)
     }
 }

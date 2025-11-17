@@ -7,22 +7,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import ru.chtcholeg.aichat.core.api.AiApiHolder
 import ru.chtcholeg.aichat.core.api.Response
 import ru.chtcholeg.aichat.database.ChatRepository
 import ru.chtcholeg.aichat.http.ApiMessage
 import ru.chtcholeg.aichat.http.ApiMessage.Role
-import java.lang.System
 import java.util.UUID
 
 class SingleAgent(
     val type: Type,
-    private val initChat: ChatMessages = createDefaultChat(type),
+    private val initChatSettings: InitChatSettings = InitChatSettings.Empty(type)
 ) : Agent {
 
-    private val chatId = initChat.id
+    private val chatId = initChatSettings.chat.id
 
     private val logicScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -36,30 +35,32 @@ class SingleAgent(
         Type.SequentialAssistant -> "Asks questions sequentially"
     }
 
-    private val chat = MutableStateFlow<ChatMessages>(initChat)
+    private val chat = MutableStateFlow<ChatMessages>(initChatSettings.chat)
     override val messages = chat.map {
         it.messages
     }.stateIn(logicScope, SharingStarted.Eagerly, emptyList())
 
-    var isChatCreated = false
+    var isChatCreated = initChatSettings is InitChatSettings.Defined
 
-    override fun addMessage(message: Message) {
-        chat.update { chat ->
-            chat.copy(
-                updatedAt = System.currentTimeMillis(),
-                messages = chat.messages + message,
-            )
-        }
+    override fun addMessage(message: Message): List<ApiMessage> {
+        val result =
+            chat.updateAndGet { chat ->
+                chat.copy(
+                    updatedAt = System.currentTimeMillis(),
+                    messages = chat.messages + message,
+                )
+            }.messages.asApiMessages()
         if (!isChatCreated) {
-            storeChat(initChat, type)
+            storeChat(initChatSettings.chat, type)
             isChatCreated = true
         }
         storeMessage(chatId, message)
+        return result
     }
 
     override suspend fun processUserRequest(request: String): Result<String> {
-        addMessage(Role.USER, request)
-        return AiApiHolder.processUserRequest(messages.value.asApiMessages())
+        val apiMessages = addMessage(Role.USER, request)
+        return AiApiHolder.processUserRequest(apiMessages)
             .onSuccess { response -> addAssistantMessage(response) }
             .map { it.content }
     }
@@ -72,7 +73,7 @@ class SingleAgent(
         requestCompletionTimeMs: Long? = null,
         promptTokens: Long? = null,
         completionTokens: Long? = null,
-    ) {
+    ): List<ApiMessage> {
         val newMessage = Message(
             role = role,
             content = content,
@@ -82,7 +83,7 @@ class SingleAgent(
             promptTokens = promptTokens,
             completionTokens = completionTokens,
         )
-        addMessage(newMessage)
+        return addMessage(newMessage)
     }
 
     private fun addAssistantMessage(response: Response) {
@@ -99,6 +100,16 @@ class SingleAgent(
     }
 
     private fun List<Message>.asApiMessages(): List<ApiMessage> = mapNotNull { it.originalApiMessage }
+
+    sealed interface InitChatSettings {
+        val chat: ChatMessages
+
+        data class Empty(val type: Type) : InitChatSettings {
+            override val chat = createDefaultChat(type)
+        }
+
+        data class Defined(override val chat: ChatMessages) : InitChatSettings
+    }
 
     sealed interface Type {
         val idInDatabase: String // Do not change this ID unnecessarily: it is used in the database
@@ -168,8 +179,6 @@ class SingleAgent(
     }
 
     companion object {
-        private val dbScope = CoroutineScope(Dispatchers.IO.limitedParallelism(1) + SupervisorJob())
-
         fun custom(
             name: String,
             responseFormat: ResponseFormat,
@@ -182,7 +191,7 @@ class SingleAgent(
             )
         )
 
-        private fun createDefaultChat(type: Type): ChatMessages {
+        fun createDefaultChat(type: Type): ChatMessages {
             val now = System.currentTimeMillis()
             return ChatMessages(
                 id = UUID.randomUUID().toString(),
@@ -194,7 +203,7 @@ class SingleAgent(
         }
 
         private fun storeChat(chat: ChatMessages, type: Type) {
-            dbScope.launch {
+            ChatRepository.scope.launch {
                 ChatRepository.createChat(
                     id = chat.id,
                     name = chat.name,
@@ -206,7 +215,7 @@ class SingleAgent(
         }
 
         private fun storeMessage(chatId: String, message: Message) {
-            dbScope.launch { addMessage(chatId, message) }
+            ChatRepository.scope.launch { addMessage(chatId, message) }
         }
 
         private suspend fun addMessage(chatId: String, message: Message) {

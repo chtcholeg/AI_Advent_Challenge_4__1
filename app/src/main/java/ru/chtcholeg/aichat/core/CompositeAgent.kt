@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import ru.chtcholeg.aichat.http.ApiMessage
 
 class CompositeAgent(
     val type: Type,
@@ -36,8 +37,9 @@ class CompositeAgent(
         }
     }
 
-    override fun addMessage(message: Message) {
+    override fun addMessage(message: Message): List<ApiMessage> {
         aggregatedMessages.update { it + message }
+        return emptyList()
     }
 
     override suspend fun processUserRequest(request: String): Result<String> {
